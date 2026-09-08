@@ -4,7 +4,6 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { ModelSelector } from './ModelSelector';
 import { EyeIcon, EyeOffIcon, CheckIcon } from '../ui/Icons';
-import { api } from '../../services/api';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,9 +24,6 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   const [showApiKey, setShowApiKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tools, setTools] = useState<any[]>([]);
-  const [webQ, setWebQ] = useState('');
-  const [webResult, setWebResult] = useState('');
-  const [webLoading, setWebLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,17 +43,6 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
     onUpdateSettings({ provider, apiKey, baseUrl, allowedPath, enableFileManager, enableGit });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleWebSearch = async () => {
-    if (!webQ.trim()) return;
-    setWebLoading(true);
-    try {
-      const res = await fetch(`/api/web/search?q=${encodeURIComponent(webQ)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
-      const j = await res.json();
-      setWebResult(JSON.stringify(j.data || j, null, 2));
-    } catch (e: any) { setWebResult(e.message); }
-    finally { setWebLoading(false); }
   };
 
   const handleProviderChange = (newProvider: ProviderType) => {
@@ -166,14 +151,7 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
 
         <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700/60 space-y-3">
           <h4 className="text-xs font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase">Tools — MCP + Free Web (Grouped)</h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Grouped by category. Toggle groups above to enable/disable. Web always ON (free).</p>
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <input value={webQ} onChange={e=>setWebQ(e.target.value)} placeholder="weather in Paris, wiki quantum, news, https://..." className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" />
-              <button onClick={handleWebSearch} disabled={webLoading} className="px-4 py-2 text-sm bg-violet-600 text-white rounded-lg disabled:opacity-50">{webLoading ? '...' : 'Search'}</button>
-            </div>
-            {webResult && <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded-xl overflow-auto max-h-40 whitespace-pre-wrap">{webResult}</pre>}
-          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Auto-connected with LLM — no manual search needed. Toggle groups above to enable/disable. Web free APIs always ON.</p>
           {(() => {
             const groups: Record<string, any[]> = {};
             tools.forEach((t: any) => {
