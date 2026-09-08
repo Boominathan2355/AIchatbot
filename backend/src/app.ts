@@ -17,9 +17,9 @@ const app = express();
 app.use(cors({
   origin: (origin, cb) => {
     // Allow same-origin (single Node) and configured frontendUrl
-    const allowed = [config.frontendUrl, 'https://aichatbot-2ll0.onrender.com'];
+    const allowed = [config.frontendUrl].filter(Boolean) as string[];
     if (!origin || allowed.includes(origin)) return cb(null, true);
-    // Allow all in production single-node mode to avoid 502/CORS confusion
+    // Allow all in production single-node mode to avoid CORS confusion
     return cb(null, true);
   },
   credentials: true,
