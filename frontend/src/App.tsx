@@ -31,13 +31,18 @@ function ChatApp({ conversationId }: { conversationId: string | null }) {
   const { messages, isStreaming, streamingContent, error, sendMessage, stopStreaming, clearMessages, setInitialMessages } = useChat(
     conversationId,
     settings.model,
-    agentMode
+    agentMode,
+    settings.provider,
+    settings.baseUrl
   );
 
   useEffect(() => {
     loadConversations();
-    loadModels();
   }, []);
+
+  useEffect(() => {
+    loadModels();
+  }, [settings.provider, settings.baseUrl]);
 
   useEffect(() => {
     setConversationLoaded(false);
@@ -67,10 +72,10 @@ function ChatApp({ conversationId }: { conversationId: string | null }) {
     } catch (err) {
       console.error('Failed to load models:', err);
       setModels([
-        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
-        { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-        { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
-        { id: 'gemini-nano', name: 'Gemini Nano' },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+        { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
         { id: 'gpt-4o', name: 'GPT-4o' },
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
         { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },

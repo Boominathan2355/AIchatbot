@@ -17,13 +17,18 @@ class ApiService {
     this.allowedPath = p;
   }
 
-  private getAuthHeaders(): Record<string, string> {
+  private getAuthHeaders(includeProviderKey = false): Record<string, string> {
     const headers: Record<string, string> = {};
     if (this.authToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`;
     }
     if (this.allowedPath) {
       headers['X-Allowed-Path'] = this.allowedPath;
+    }
+    // Sent as a header rather than a query parameter so the key never lands
+    // in access logs or browser history.
+    if (includeProviderKey && this.apiKey) {
+      headers['X-Provider-Key'] = this.apiKey;
     }
     return headers;
   }
@@ -79,12 +84,14 @@ class ApiService {
     attachments?: any[],
     conversationId?: string,
     provider: string = 'gemini',
-    baseUrl?: string
+    baseUrl?: string,
+    signal?: AbortSignal
   ): Promise<ReadableStream<string>> {
     let response: Response;
     try {
       response = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
+        signal,
         headers: {
           'Content-Type': 'application/json',
           ...this.getAuthHeaders(),
@@ -101,6 +108,7 @@ class ApiService {
         }),
       });
     } catch (err: any) {
+      if (err?.name === 'AbortError') throw err;
       throw new Error('Cannot connect to backend server. Make sure it is running on port 3001.');
     }
 
@@ -115,6 +123,9 @@ class ApiService {
     return new ReadableStream({
       async start(controller) {
         let buffer = '';
+        const onAbort = () => { reader.cancel().catch(() => {}); };
+        signal?.addEventListener('abort', onAbort, { once: true });
+        try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -141,6 +152,12 @@ class ApiService {
           }
         }
         controller.close();
+        } catch (err: any) {
+          if (err?.name === 'AbortError') controller.close();
+          else controller.error(err);
+        } finally {
+          signal?.removeEventListener('abort', onAbort);
+        }
       },
     });
   }
@@ -160,10 +177,9 @@ class ApiService {
   async getModels(provider: string = 'gemini', baseUrl?: string): Promise<any[]> {
     const params = new URLSearchParams();
     if (provider) params.set('provider', provider);
-    if (this.apiKey) params.set('apiKey', this.apiKey);
     if (baseUrl) params.set('baseUrl', baseUrl);
     const url = `${API_BASE}/models?${params.toString()}`;
-    const result = await this.safeFetch(url, { headers: this.getAuthHeaders() });
+    const result = await this.safeFetch(url, { headers: this.getAuthHeaders(true) });
     return result.data || [];
   }
 

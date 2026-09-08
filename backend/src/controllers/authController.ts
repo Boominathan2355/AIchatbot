@@ -23,7 +23,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     }
 
     const cleanUsername = String(username).trim();
-    const existingUser = await User.findOne({ username: { $regex: `^${cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+    const existingUser = await User.findOne({ username: cleanUsername }).collation({ locale: 'en', strength: 2 });
     if (existingUser) {
       res.status(409).json({ error: { message: 'Username already taken' } });
       return;
@@ -39,10 +39,16 @@ export async function register(req: Request, res: Response): Promise<void> {
     const token = generateToken(user._id.toString());
 
     res.status(201).json({
-      user: { id: user._id.toString(), username },
+      user: { id: user._id.toString(), username: user.username },
       token,
     });
   } catch (error: any) {
+    // Two concurrent registrations can both pass the check above; the unique
+    // index is what actually decides, so surface its rejection as a conflict.
+    if (error?.code === 11000) {
+      res.status(409).json({ error: { message: 'Username already taken' } });
+      return;
+    }
     console.error('Register error:', error);
     res.status(500).json({ error: { message: 'Failed to register user' } });
   }
@@ -58,7 +64,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const cleanLogin = String(login).trim();
-    const user = await User.findOne({ username: { $regex: `^${cleanLogin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+    const user = await User.findOne({ username: cleanLogin }).collation({ locale: 'en', strength: 2 });
     if (!user) {
       res.status(401).json({ error: { message: 'Invalid credentials' } });
       return;

@@ -23,6 +23,9 @@ export function useChat(
     setIsStreaming(true);
     setStreamingContent('');
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const userMessage: Message = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
       role: 'user',
@@ -38,6 +41,9 @@ export function useChat(
 
     setMessages(prev => [...prev, userMessage]);
 
+    let fullContent = '';
+    let reader: ReadableStreamDefaultReader<string> | undefined;
+
     try {
       const effectiveConversationId = overrideConversationId ?? conversationId;
       const stream = await api.chatStream(
@@ -47,10 +53,10 @@ export function useChat(
         attachments,
         effectiveConversationId || undefined,
         provider,
-        baseUrl
+        baseUrl,
+        abortController.signal
       );
-      const reader = stream.getReader();
-      let fullContent = '';
+      reader = stream.getReader();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -59,7 +65,7 @@ export function useChat(
         setStreamingContent(fullContent);
       }
 
-      if (fullContent) {
+      if (fullContent && !abortController.signal.aborted) {
         const assistantMessage: Message = {
           id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
           role: 'assistant',
@@ -71,7 +77,17 @@ export function useChat(
       setStreamingContent('');
     } catch (err: any) {
       setStreamingContent('');
-      if (err.name !== 'AbortError') {
+      if (err.name === 'AbortError') {
+        // User pressed Stop: keep whatever streamed rather than dropping it.
+        if (fullContent) {
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
+            role: 'assistant',
+            content: fullContent + '\n\n_(stopped)_',
+            createdAt: new Date().toISOString(),
+          }]);
+        }
+      } else {
         const raw = err.message || 'Failed to get response. Make sure the backend server is running.';
         const isQuota = raw.includes('QUOTA_EXCEEDED') || raw.includes('429') || raw.toLowerCase().includes('quota') || raw.includes('Too Many Requests');
         let errorMsg = raw.replace('QUOTA_EXCEEDED: ', '');
@@ -96,11 +112,9 @@ export function useChat(
   }, [conversationId, model, agentMode, provider, baseUrl, isStreaming]);
 
   const stopStreaming = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    setIsStreaming(false);
-    setStreamingContent('');
+    // Aborting the controller tears down the fetch and the reader; the
+    // in-flight sendMessage resolves through its AbortError path.
+    abortControllerRef.current?.abort();
   }, []);
 
   const clearMessages = useCallback(() => {

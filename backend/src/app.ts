@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs';
 import { config } from './config/env';
-import { connectDB } from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/auth';
@@ -18,13 +18,19 @@ import webRoutes from './routes/web';
 
 const app = express();
 
+// Behind a proxy (Render, nginx) req.ip must come from X-Forwarded-For,
+// otherwise every client shares a single rate-limit bucket.
+app.set('trust proxy', 1);
+
+const LOCALHOST_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow same-origin (single Node) and configured frontendUrl
-    const allowed = [config.frontendUrl].filter(Boolean) as string[];
-    if (!origin || allowed.includes(origin)) return cb(null, true);
-    // Allow all in production single-node mode to avoid CORS confusion
-    return cb(null, true);
+    // No Origin header: same-origin navigation, curl, server-to-server.
+    if (!origin) return cb(null, true);
+    if (config.corsOrigins.includes(origin)) return cb(null, true);
+    if (!config.isProduction && LOCALHOST_ORIGIN.test(origin)) return cb(null, true);
+    return cb(new Error(`Origin ${origin} is not allowed by CORS`));
   },
   credentials: true,
 }));
@@ -34,17 +40,11 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(rateLimiter(100, 60000));
 
-// Connect to MongoDB on startup
-connectDB().catch((err) => {
-  console.error('Failed to connect to MongoDB:', err);
-});
-
-app.get('/api/health', async (_req, res) => {
-  const mongoose = await import('mongoose');
+app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    mongodb: mongoose.default.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
 });
 

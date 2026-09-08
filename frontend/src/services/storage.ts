@@ -8,12 +8,13 @@ export function getSettings(): Settings {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      const deprecated = ['gemini-2.5-flash','gemini-2.5-pro','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-flash-8b'];
+      // Ids that were never real Gemini models, or have been retired.
+      const deprecated = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-nano', 'gemini-1.5-flash-8b'];
       return {
         provider: parsed.provider || 'gemini',
         apiKey: parsed.apiKey || '',
         baseUrl: parsed.baseUrl || '',
-        model: parsed.model && !deprecated.includes(parsed.model) ? parsed.model : 'gemini-3.8-flash',
+        model: parsed.model && !deprecated.includes(parsed.model) ? parsed.model : 'gemini-2.5-flash',
         theme: parsed.theme || 'dark',
         allowedPath: parsed.allowedPath || '',
         enableFileManager: parsed.enableFileManager || false,
@@ -27,7 +28,7 @@ export function getSettings(): Settings {
     provider: 'gemini',
     apiKey: '',
     baseUrl: '',
-    model: 'gemini-3.8-flash',
+    model: 'gemini-2.5-flash',
     theme: 'dark',
     allowedPath: '',
     enableFileManager: false,

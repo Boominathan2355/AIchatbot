@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { config } from '../config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ai-agent-chatbot-jwt-secret-2026';
+const JWT_SECRET = config.jwtSecret;
 
 export interface AuthRequest extends Request {
   userId?: string;

@@ -2,29 +2,51 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { MCP_TOOLS } from '../mcp/tools';
 import { fetchUrl, wikiSummary, openMeteoWeather, hackerNewsTop } from '../services/webService';
+import { resolveAllowedPath } from '../utils/pathGuard';
 import path from 'path';
 import fs from 'fs/promises';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+const FILESYSTEM_TOOLS = new Set(['file_list', 'file_read', 'file_write', 'file_delete', 'dir_create']);
+const GIT_TOOLS = new Set(['git_status', 'git_log', 'git_add', 'git_commit']);
+
+async function runGit(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, { cwd, maxBuffer: 10 * 1024 * 1024, timeout: 30_000 });
+  return stdout;
+}
+
+function toPathspecs(files: unknown): string[] {
+  const list = Array.isArray(files) ? files : typeof files === 'string' ? [files] : ['.'];
+  const specs = list.map(String).filter((f) => f.length > 0);
+  if (specs.length === 0) return ['.'];
+  if (specs.some((f) => f.startsWith('-'))) throw new Error('File paths may not start with "-"');
+  return specs;
+}
 
 export async function listMcpTools(_req: AuthRequest, res: Response) {
   res.json({ data: MCP_TOOLS });
 }
 
 export async function callMcpTool(req: AuthRequest, res: Response) {
-  const { name, arguments: args } = req.body;
-  const allowedBase = (req.headers['x-allowed-path'] as string) || args?.allowedPath || '';
-  const base = allowedBase ? path.resolve(allowedBase) : null;
-  const check = (p: string) => !base || p === base || p.startsWith(base + path.sep);
+  const { name, arguments: args = {} } = req.body;
+
+  const needsPath = FILESYSTEM_TOOLS.has(name) || GIT_TOOLS.has(name);
+  let targetPath = '';
+  let basePath = '';
+
+  if (needsPath) {
+    const guard = await resolveAllowedPath(req, args?.path);
+    if (!guard.ok) { res.status(guard.status).json({ error: { message: guard.message } }); return; }
+    targetPath = guard.target;
+    basePath = guard.base;
+  }
 
   try {
     let result: any = null;
-    const targetPath = args?.path ? path.resolve(args.path) : base || process.cwd();
-    if (args?.path && base && !check(path.resolve(args.path))) {
-      res.status(403).json({ error: { message: 'Path not allowed' } }); return;
-    }
+
     switch (name) {
       case 'file_list': {
         const entries = await fs.readdir(targetPath, { withFileTypes: true });
@@ -43,8 +65,13 @@ export async function callMcpTool(req: AuthRequest, res: Response) {
         break;
       }
       case 'file_delete': {
+        if (targetPath === basePath) {
+          res.status(400).json({ error: { message: 'Refusing to delete the allowed root directory.' } });
+          return;
+        }
         const st = await fs.stat(targetPath);
-        if (st.isDirectory()) await fs.rm(targetPath, { recursive: true, force: true }); else await fs.unlink(targetPath);
+        if (st.isDirectory()) await fs.rm(targetPath, { recursive: true, force: true });
+        else await fs.unlink(targetPath);
         result = { success: true };
         break;
       }
@@ -53,44 +80,40 @@ export async function callMcpTool(req: AuthRequest, res: Response) {
         result = { success: true, path: targetPath };
         break;
       }
-      case 'git_status': {
-        const { stdout } = await execAsync('git status --porcelain --branch', { cwd: targetPath });
-        result = { stdout };
+      case 'git_status':
+        result = { stdout: await runGit(targetPath, ['status', '--porcelain', '--branch']) };
         break;
-      }
-      case 'git_log': {
-        const { stdout } = await execAsync('git log --oneline -20', { cwd: targetPath });
-        result = { stdout };
+      case 'git_log':
+        result = { stdout: await runGit(targetPath, ['log', '--oneline', '-20']) };
         break;
-      }
-      case 'git_add': {
-        const { stdout } = await execAsync(`git add ${args.files || '.'}`, { cwd: targetPath });
-        result = { stdout };
+      case 'git_add':
+        result = { stdout: await runGit(targetPath, ['add', '--', ...toPathspecs(args.files)]) };
         break;
-      }
       case 'git_commit': {
-        const { stdout } = await execAsync(`git commit -m "${(args.message || '').replace(/"/g, '\\"')}"`, { cwd: targetPath });
-        result = { stdout };
+        if (!args.message || typeof args.message !== 'string') {
+          res.status(400).json({ error: { message: 'commit message required' } });
+          return;
+        }
+        result = { stdout: await runGit(targetPath, ['commit', '-m', args.message]) };
         break;
       }
-      case 'web_fetch': {
+      case 'web_fetch':
         result = { content: await fetchUrl(args.url) };
         break;
-      }
-      case 'wiki_search': {
+      case 'wiki_search':
         result = { content: await wikiSummary(args.query) };
         break;
-      }
-      case 'weather': {
+      case 'weather':
         result = { content: await openMeteoWeather(args.lat, args.lon) };
         break;
-      }
-      case 'news': {
+      case 'news':
         result = { content: await hackerNewsTop() };
         break;
-      }
-      default: res.status(400).json({ error: { message: `Unknown tool ${name}` } }); return;
+      default:
+        res.status(400).json({ error: { message: `Unknown tool ${name}` } });
+        return;
     }
+
     res.json({ data: result });
   } catch (err: any) {
     res.status(500).json({ error: { message: err.message } });

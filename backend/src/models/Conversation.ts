@@ -5,7 +5,7 @@ export interface MessageAttachment {
   fileName: string;
   fileType: string;
   fileSize: number;
-  base64Data: string;
+  base64Data?: string;
   mimeType: string;
   preview?: string;
 }
@@ -34,7 +34,9 @@ const MessageSchema = new Schema({
     fileName: { type: String, required: true },
     fileType: { type: String, required: true },
     fileSize: { type: Number, required: true },
-    base64Data: { type: String, required: true },
+    // Optional: large attachments are stored as metadata only so a
+    // conversation cannot exceed MongoDB's 16MB document limit.
+    base64Data: { type: String },
     mimeType: { type: String, required: true },
     preview: { type: String },
   }],

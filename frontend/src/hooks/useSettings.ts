@@ -12,10 +12,6 @@ export function useSettings() {
     api.setAllowedPath(settings.allowedPath || '');
   }, [settings.apiKey, settings.allowedPath]);
 
-  useEffect(() => {
-    api.setAllowedPath(settings.allowedPath || '');
-  }, [settings.allowedPath]);
-
   const updateSettings = (updates: Partial<Settings>) => {
     const newSettings = { ...settings, ...updates };
     setSettings(newSettings);

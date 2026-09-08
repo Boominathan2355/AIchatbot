@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Provider, StreamChatOptions, ProviderResponse, ProviderConfig } from './types';
-import { AgentMode } from '../../types/gemini';
 
 function getSystemPrompt(agentMode: string): string {
   const prompts: Record<string, string> = {
@@ -60,17 +59,39 @@ function buildContents(messages: any[], agentMode: string) {
   return contents;
 }
 
+/**
+ * Model ids published by the Gemini API. Earlier releases of this file used
+ * invented ids (gemini-3.8-flash and friends) which 404 on every request and
+ * silently burned a round trip before the fallback chain took over.
+ */
+export const GEMINI_MODELS = [
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fast, best for most tasks' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Advanced reasoning and analysis' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', description: 'Lowest latency and cost' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Previous generation' },
+];
+
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+
+/** Ids retired or never real, mapped onto a current equivalent. */
+const MODEL_ALIASES: Record<string, string> = {
+  'gemini-nano': 'gemini-2.5-flash-lite',
+  'gemini-3.8-flash': 'gemini-2.5-flash',
+  'gemini-3.5-flash-lite': 'gemini-2.5-flash-lite',
+  'gemini-3.1-flash-lite': 'gemini-2.5-flash-lite',
+  'gemini-1.5-flash-8b': 'gemini-2.5-flash-lite',
+};
+
 function mapModel(id: string): string {
-  if (id === 'gemini-nano') return 'gemini-1.5-flash-8b';
-  return id;
+  return MODEL_ALIASES[id] || id;
 }
 
 function fallbackChain(primary: string): string[] {
-  const mapped = mapModel(primary);
-  const chain = [mapped];
-  // fallbacks for 503 high demand
-  const fallbacks = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
-  for (const f of fallbacks) if (!chain.includes(f)) chain.push(f);
+  const chain = [mapModel(primary)];
+  // Retried only on 503 / overload, in descending capability order.
+  for (const f of ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']) {
+    if (!chain.includes(f)) chain.push(f);
+  }
   return chain;
 }
 
@@ -140,15 +161,7 @@ export class GeminiProvider implements Provider {
     throw lastErr;
   }
 
-  async listModels(config: ProviderConfig): Promise<{ id: string; name: string }[]> {
-    const base = [
-      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
-      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-      { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
-      { id: 'gemini-nano', name: 'Gemini Nano' },
-    ];
-    const apiKey = config.apiKey || process.env.GEMINI_API_KEY;
-    if (!apiKey) return base;
-    return base;
+  async listModels(_config: ProviderConfig): Promise<{ id: string; name: string }[]> {
+    return GEMINI_MODELS.map(({ id, name }) => ({ id, name }));
   }
 }

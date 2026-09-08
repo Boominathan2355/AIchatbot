@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from '../services/api';
-import { encode } from '../utils/crypto';
 
 interface User {
   id: string;

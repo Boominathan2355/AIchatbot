@@ -1,11 +1,4 @@
-const app = require('./dist/app').default;
-const { config } = require('./dist/config/env');
-
-const server = app.listen(config.port, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${config.port}`);
-});
-
-process.on('SIGTERM', () => {
-  console.log('Shutting down...');
-  server.close(() => process.exit(0));
-});
+// Thin wrapper around the compiled entry point. Deferring to dist/index.js
+// keeps environment loading and the database connection in one place -
+// this file previously required dist/app directly, skipping both.
+require('./dist/index.js');
