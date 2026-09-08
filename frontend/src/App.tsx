@@ -11,8 +11,7 @@ import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
 import { useChat } from './hooks/useChat';
 import { useAuth } from './contexts/AuthContext';
-import { MenuIcon, SunIcon, MoonIcon, LogoutIcon, WrenchIcon } from './components/ui/Icons';
-import { ToolsPanel } from './components/tools/ToolsPanel';
+import { MenuIcon, SunIcon, MoonIcon, LogoutIcon } from './components/ui/Icons';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProviderType } from './types/chat';
 
@@ -28,7 +27,6 @@ function ChatApp({ conversationId }: { conversationId: string | null }) {
   const [models, setModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [conversationLoaded, setConversationLoaded] = useState(false);
-  const [showTools, setShowTools] = useState(false);
 
   const { messages, isStreaming, streamingContent, error, sendMessage, stopStreaming, clearMessages, setInitialMessages } = useChat(
     conversationId,
@@ -190,13 +188,6 @@ function ChatApp({ conversationId }: { conversationId: string | null }) {
 
           <div className="flex items-center gap-0.5">
             <button
-              onClick={() => setShowTools(true)}
-              className="p-2 text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              title="Tools (MCP + Web free APIs)"
-            >
-              <WrenchIcon className="w-[1.125rem] h-[1.125rem]" />
-            </button>
-            <button
               onClick={toggleTheme}
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -249,7 +240,6 @@ function ChatApp({ conversationId }: { conversationId: string | null }) {
         models={models}
         onRefreshModels={onRefreshModels}
       />
-      <ToolsPanel isOpen={showTools} onClose={() => setShowTools(false)} settings={settings} onUpdateSettings={updateSettings} />
     </div>
   );
 }

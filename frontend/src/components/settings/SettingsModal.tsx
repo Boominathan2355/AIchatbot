@@ -24,6 +24,10 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   const [enableGit, setEnableGit] = useState(!!settings.enableGit);
   const [showApiKey, setShowApiKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [tools, setTools] = useState<any[]>([]);
+  const [webQ, setWebQ] = useState('');
+  const [webResult, setWebResult] = useState('');
+  const [webLoading, setWebLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +37,9 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
       setAllowedPath(settings.allowedPath || '');
       setEnableFileManager(!!settings.enableFileManager);
       setEnableGit(!!settings.enableGit);
+      // fetch MCP tools for display inside Settings
+      fetch(`/api/mcp/tools`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } })
+        .then(r => r.json()).then(j => setTools(j.data || j || [])).catch(() => setTools([]));
     }
   }, [isOpen, settings]);
 
@@ -40,6 +47,17 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
     onUpdateSettings({ provider, apiKey, baseUrl, allowedPath, enableFileManager, enableGit });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleWebSearch = async () => {
+    if (!webQ.trim()) return;
+    setWebLoading(true);
+    try {
+      const res = await fetch(`/api/web/search?q=${encodeURIComponent(webQ)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
+      const j = await res.json();
+      setWebResult(JSON.stringify(j.data || j, null, 2));
+    } catch (e: any) { setWebResult(e.message); }
+    finally { setWebLoading(false); }
   };
 
   const handleProviderChange = (newProvider: ProviderType) => {
@@ -128,13 +146,56 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
             />
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={enableFileManager} onChange={(e) => setEnableFileManager(e.target.checked)} className="rounded" />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Enable File Manager</span>
+            <input type="checkbox" checked={enableFileManager} onChange={(e) => setEnableFileManager(e.target.checked)} className="w-4 h-4 rounded" />
+            <span className={enableFileManager ? 'text-sm font-medium text-green-600 dark:text-green-400' : 'text-sm text-gray-700 dark:text-gray-300'}>Enable File Manager {enableFileManager ? 'ON' : 'OFF'}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={enableGit} onChange={(e) => setEnableGit(e.target.checked)} className="rounded" />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Enable Git</span>
+            <input type="checkbox" checked={enableGit} onChange={(e) => setEnableGit(e.target.checked)} className="w-4 h-4 rounded" />
+            <span className={enableGit ? 'text-sm font-medium text-green-600 dark:text-green-400' : 'text-sm text-gray-700 dark:text-gray-300'}>Enable Git {enableGit ? 'ON' : 'OFF'}</span>
           </label>
+          <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full w-fit">Web Free APIs ON</span>
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Tools (MCP + Free Web)</h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400">MCP tools exposed via <code>/api/mcp/tools</code>. Disabled groups are hidden and blocked (403). Web uses free APIs – no cost.</p>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input value={webQ} onChange={e=>setWebQ(e.target.value)} placeholder="weather in Paris, wiki quantum, news, https://..." className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg" />
+              <button onClick={handleWebSearch} disabled={webLoading} className="px-4 py-2 text-sm bg-violet-600 text-white rounded-lg disabled:opacity-50">{webLoading ? '...' : 'Search'}</button>
+            </div>
+            {webResult && <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded-xl overflow-auto max-h-40 whitespace-pre-wrap">{webResult}</pre>}
+          </div>
+          {(() => {
+            const groups: Record<string, any[]> = {};
+            tools.forEach((t: any) => {
+              const cat = t.name.startsWith('file_') || t.name.startsWith('dir_') ? 'File Manager' : t.name.startsWith('git_') ? 'Git' : 'Web';
+              (groups[cat] = groups[cat] || []).push(t);
+            });
+            const filtered: Record<string, any[]> = {};
+            Object.entries(groups).forEach(([cat, list]) => {
+              if (cat === 'File Manager' && !enableFileManager) return;
+              if (cat === 'Git' && !enableGit) return;
+              filtered[cat] = list;
+            });
+            if (tools.length === 0) return <p className="text-sm text-gray-500">Loading tools...</p>;
+            if (Object.keys(filtered).length === 0) return <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl">All groups disabled. Enable File Manager / Git above.</p>;
+            return Object.entries(filtered).map(([cat, list]: any) => (
+              <div key={cat}>
+                <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{cat} ({list.length})</h5>
+                <div className="grid gap-1.5">
+                  {list.map((t: any) => (
+                    <div key={t.name} className="px-3 py-2 bg-white dark:bg-[#232323] border border-gray-200 dark:border-gray-700 rounded-xl">
+                      <div className="text-sm font-mono font-medium text-gray-900 dark:text-white">{t.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{t.description}</div>
+                      <div className="text-[10px] text-gray-400 mt-1 font-mono">{JSON.stringify(t.inputSchema?.properties || {})}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
+          <div className="text-[11px] text-gray-400">MCP: <code>/api/mcp/call</code> {"{name, arguments}"} • Web: <code>/api/web/search?q=</code>, <code>/api/web/fetch?url=</code></div>
         </div>
 
         <Button onClick={handleSave} className="w-full">
