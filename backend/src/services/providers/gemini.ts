@@ -60,37 +60,73 @@ function buildContents(messages: any[], agentMode: string) {
   return contents;
 }
 
+function mapModel(id: string): string {
+  if (id === 'gemini-nano') return 'gemini-1.5-flash-8b';
+  return id;
+}
+
+function fallbackChain(primary: string): string[] {
+  const mapped = mapModel(primary);
+  const chain = [mapped];
+  // fallbacks for 503 high demand
+  const fallbacks = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+  for (const f of fallbacks) if (!chain.includes(f)) chain.push(f);
+  return chain;
+}
+
 export class GeminiProvider implements Provider {
   async *streamChat({ messages, model, config }: StreamChatOptions): AsyncGenerator<string, void, unknown> {
     const apiKey = config.apiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('Gemini API key is required');
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const geminiModel = genAI.getGenerativeModel({ model });
-
     const agentMode = (messages as any).agentMode || 'chat';
     const contents = buildContents(messages, agentMode);
+    const chain = fallbackChain(model);
 
-    const result = await geminiModel.generateContentStream({ contents });
-
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
-      if (text) yield text;
+    let lastErr: any = null;
+    for (const m of chain) {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const geminiModel = genAI.getGenerativeModel({ model: m });
+        const result = await geminiModel.generateContentStream({ contents });
+        for await (const chunk of result.stream) {
+          const text = chunk.text();
+          if (text) yield text;
+        }
+        return;
+      } catch (err: any) {
+        lastErr = err;
+        const is503 = err.status === 503 || err.message?.includes('503') || err.message?.includes('high demand');
+        if (!is503 || m === chain[chain.length - 1]) throw err;
+        console.warn(`Model ${m} failed 503, trying fallback ${chain[chain.indexOf(m)+1]}`);
+      }
     }
+    throw lastErr;
   }
 
   async chat({ messages, model, config }: StreamChatOptions): Promise<ProviderResponse> {
     const apiKey = config.apiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('Gemini API key is required');
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const geminiModel = genAI.getGenerativeModel({ model });
-
     const agentMode = (messages as any).agentMode || 'chat';
     const contents = buildContents(messages, agentMode);
+    const chain = fallbackChain(model);
 
-    const result = await geminiModel.generateContent({ contents });
-    return { content: result.response.text() };
+    let lastErr: any = null;
+    for (const m of chain) {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const geminiModel = genAI.getGenerativeModel({ model: m });
+        const result = await geminiModel.generateContent({ contents });
+        return { content: result.response.text() };
+      } catch (err: any) {
+        lastErr = err;
+        const is503 = err.status === 503 || err.message?.includes('503');
+        if (!is503 || m === chain[chain.length - 1]) throw err;
+        console.warn(`Model ${m} failed, fallback ${chain[chain.indexOf(m)+1]}`);
+      }
+    }
+    throw lastErr;
   }
 
   async listModels(config: ProviderConfig): Promise<{ id: string; name: string }[]> {
