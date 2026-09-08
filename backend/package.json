@@ -1,5 +1,5 @@
 {
-  "name": "gemini-chatbot-backend",
+  "name": "aichatbot-be",
   "version": "1.0.0",
   "description": "Gemini AI Chatbot Backend with Document Analysis Agent",
   "main": "dist/index.js",
