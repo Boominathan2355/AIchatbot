@@ -244,3 +244,11 @@ export function BrainIcon({ className = 'w-5 h-5', ...props }: IconProps) {
     </svg>
   );
 }
+
+export function WrenchIcon({ className = 'w-5 h-5', ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.148L17.25 21A2.25 2.25 0 0021 17.25l-5.877-5.877M11.42 15.148a3 3 0 01-4.242 0l-2.12-2.12a3 3 0 010-4.242L9.75 4.095a2.25 2.25 0 013.182 0l1.06 1.06a2.25 2.25 0 010 3.182l-2.57 2.571a3 3 0 000 4.24z M6 18L18 6" />
+    </svg>
+  );
+}
