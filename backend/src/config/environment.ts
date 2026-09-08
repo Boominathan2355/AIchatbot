@@ -1,71 +1,87 @@
 import crypto from 'crypto';
 
-const nodeEnv = process.env.NODE_ENV || 'development';
-const isProduction = nodeEnv === 'production';
+function requireEnv(name: string): string {
+  const value = process.env[name];
 
-/**
- * JWT secret. Required in production; in development a random per-process
- * secret is generated so a missing .env cannot silently fall back to a
- * publicly-known value (tokens simply stop working across restarts).
- */
-function resolveJwtSecret(): string {
-  const fromEnv = process.env.JWT_SECRET;
-  if (fromEnv) return fromEnv;
-  if (isProduction) {
-    throw new Error('JWT_SECRET is not set. Generate one with: openssl rand -hex 32');
+  if (!value || !value.trim()) {
+    throw new Error(`Required environment variable ${name} is not set`);
   }
-  console.warn('[config] JWT_SECRET not set - using a random secret for this process only. Sessions will not survive a restart.');
-  return crypto.randomBytes(32).toString('hex');
+
+  return value.trim();
 }
 
-function parseList(value: string | undefined, fallback: string): string[] {
-  return (value || fallback)
+function getEnv(name: string, fallback = ''): string {
+  return process.env[name]?.trim() || fallback;
+}
+
+function parseList(name: string): string[] {
+  return requireEnv(name)
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
-function parseInteger(value: string | undefined, fallback: number): number {
-  const parsed = parseInt(value || '', 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
+function parseInteger(name: string): number {
+  const value = requireEnv(name);
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    throw new Error(
+      `Environment variable ${name} must be a valid number. Received: ${value}`
+    );
+  }
+
+  return parsed;
 }
 
-/** Origins allowed to call the API. In development, localhost is always permitted. */
-const corsOrigins = parseList(process.env.FRONTEND_URL, 'http://localhost:5173');
+function resolveJwtSecret(): string {
+  const secret = requireEnv('JWT_SECRET');
+
+  if (secret.length < 32) {
+    throw new Error(
+      'JWT_SECRET must be at least 32 characters long'
+    );
+  }
+
+  return secret;
+}
+
+const nodeEnv = getEnv('NODE_ENV', 'development');
+const isProduction = nodeEnv === 'production';
 
 export const config = {
-  port: parseInteger(process.env.PORT, 3001),
+  // Server
+  port: parseInteger('PORT'),
   nodeEnv,
   isProduction,
 
-  mongodbUri: process.env.MONGODB_URI || '',
+  // Database
+  mongodbUri: requireEnv('MONGODB_URI'),
 
-  /** Provider keys used when the client does not supply its own. */
-  geminiApiKey: process.env.GEMINI_API_KEY || '',
-  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  // AI Providers
+  geminiApiKey: getEnv('GEMINI_API_KEY'),
+  openaiApiKey: getEnv('OPENAI_API_KEY'),
 
+  // Authentication
   jwtSecret: resolveJwtSecret(),
 
-  corsOrigins,
-  frontendUrl: corsOrigins[0],
+  // Frontend / CORS
+  corsOrigins: parseList('FRONTEND_URL'),
+  frontendUrl: requireEnv('FRONTEND_URL')
+    .split(',')[0]
+    .trim(),
 
-  /**
-   * Outer boundary for all local file and git access, set by the server
-   * operator. When unset, those endpoints are disabled entirely - a client
-   * cannot opt itself in. The per-user "Allowed Path" setting may only
-   * narrow this, never widen it.
-   */
-  allowedBasePath: process.env.ALLOWED_BASE_PATH || '',
+  // Application
+  allowedBasePath: getEnv('ALLOWED_BASE_PATH'),
 
-  maxFileSize: parseInteger(process.env.MAX_FILE_SIZE, 20 * 1024 * 1024),
-  allowedFileTypes: parseList(process.env.ALLOWED_FILE_TYPES, 'pdf,docx,txt,png,jpg,jpeg,webp'),
+  // File Upload
+  maxFileSize: parseInteger('MAX_FILE_SIZE'),
+  allowedFileTypes: parseList('ALLOWED_FILE_TYPES'),
 
-  /**
-   * Attachments above this size are persisted as metadata only. Conversations
-   * are single MongoDB documents capped at 16MB, so embedding large base64
-   * payloads makes them permanently unsaveable.
-   */
-  maxStoredAttachmentBytes: parseInteger(process.env.MAX_STORED_ATTACHMENT_BYTES, 1024 * 1024),
+  // Storage
+  maxStoredAttachmentBytes: parseInteger(
+    'MAX_STORED_ATTACHMENT_BYTES'
+  ),
 };
 
 export type AppConfig = typeof config;

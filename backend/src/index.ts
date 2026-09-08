@@ -1,5 +1,4 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import './config/load-env';
 
 import app from './app';
 import { config } from './config/environment';
