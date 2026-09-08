@@ -1,41 +1,55 @@
 import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
-import { wikiSummary, duckDuckGo, openMeteoWeather, hackerNewsTop, fetchUrl, collectWebContext } from '../services/webService';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import {
+  collectWebContext,
+  fetchHackerNewsTopStories,
+  fetchPageText,
+  fetchWeatherForecast,
+  fetchWikipediaSummary,
+  searchDuckDuckGo,
+} from '../services/webService';
+import { sendData, sendError } from '../utils/apiResponse';
 
-export async function webSearch(req: AuthRequest, res: Response) {
-  const q = (req.query.q as string) || req.body?.q || '';
-  if (!q) { res.status(400).json({ error: { message: 'q required' } }); return; }
-  const ctx = await collectWebContext(q);
-  res.json({ data: { query: q, context: ctx } });
+/** London, used when no coordinates are supplied. */
+const DEFAULT_LATITUDE = 51.5;
+const DEFAULT_LONGITUDE = -0.12;
+
+function readQueryOrBody(req: AuthenticatedRequest, key: string): string {
+  return (req.query[key] as string) || req.body?.[key] || '';
 }
 
-export async function webFetch(req: AuthRequest, res: Response) {
-  const url = (req.query.url as string) || req.body?.url;
-  if (!url) { res.status(400).json({ error: { message: 'url required' } }); return; }
-  const content = await fetchUrl(url);
-  res.json({ data: { url, content } });
+export async function searchWeb(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const query = readQueryOrBody(req, 'q');
+  if (!query) {
+    sendError(res, 400, 'q required');
+    return;
+  }
+  sendData(res, { query, context: await collectWebContext(query) });
 }
 
-export async function webWiki(req: AuthRequest, res: Response) {
-  const q = (req.query.q as string) || req.body?.q;
-  const content = await wikiSummary(q);
-  res.json({ data: { content } });
+export async function fetchWebPage(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const url = readQueryOrBody(req, 'url');
+  if (!url) {
+    sendError(res, 400, 'url required');
+    return;
+  }
+  sendData(res, { url, content: await fetchPageText(url) });
 }
 
-export async function webWeather(req: AuthRequest, res: Response) {
-  const lat = parseFloat(req.query.lat as string) || req.body?.lat || 51.5;
-  const lon = parseFloat(req.query.lon as string) || req.body?.lon || -0.12;
-  const content = await openMeteoWeather(lat, lon);
-  res.json({ data: { content } });
+export async function getWikipediaSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+  sendData(res, { content: await fetchWikipediaSummary(readQueryOrBody(req, 'q')) });
 }
 
-export async function webNews(req: AuthRequest, res: Response) {
-  const content = await hackerNewsTop();
-  res.json({ data: { content } });
+export async function getWeatherForecast(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const latitude = parseFloat(req.query.lat as string) || req.body?.lat || DEFAULT_LATITUDE;
+  const longitude = parseFloat(req.query.lon as string) || req.body?.lon || DEFAULT_LONGITUDE;
+  sendData(res, { content: await fetchWeatherForecast(latitude, longitude) });
 }
 
-export async function webDuck(req: AuthRequest, res: Response) {
-  const q = (req.query.q as string) || req.body?.q || '';
-  const content = await duckDuckGo(q);
-  res.json({ data: { content } });
+export async function getTopNews(_req: AuthenticatedRequest, res: Response): Promise<void> {
+  sendData(res, { content: await fetchHackerNewsTopStories() });
+}
+
+export async function searchDuckDuckGoInstant(req: AuthenticatedRequest, res: Response): Promise<void> {
+  sendData(res, { content: await searchDuckDuckGo(readQueryOrBody(req, 'q')) });
 }

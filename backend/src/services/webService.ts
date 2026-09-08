@@ -1,83 +1,123 @@
-// Free APIs – no paid search cost
-export async function wikiSummary(query: string): Promise<string> {
+/**
+ * Free, keyless web data sources used for realtime context. Every function
+ * returns a human-readable block that is pasted into the model prompt.
+ */
+
+const USER_AGENT = 'aichatbot/1.0';
+const PAGE_TEXT_LIMIT = 8000;
+const TOP_STORIES_LIMIT = 5;
+const RELATED_TOPICS_LIMIT = 3;
+const WIKI_QUERY_WORD_LIMIT = 5;
+
+/** London, used when a weather request names no location. */
+const DEFAULT_COORDINATES = { latitude: 51.5, longitude: -0.12 };
+
+async function fetchJson<T = any>(url: string): Promise<T> {
+  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  return response.json() as Promise<T>;
+}
+
+export async function fetchWikipediaSummary(query: string): Promise<string> {
   try {
     const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'aichatbot/1.0' } });
-    if (!res.ok) return `Wiki fetch failed ${res.status}`;
-    const j: any = await res.json();
-    return `Wikipedia: ${j.title}\n${j.extract}\nSource: ${j.content_urls?.desktop?.page || url}`;
-  } catch (e: any) { return `Wiki error: ${e.message}`; }
+    const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!response.ok) return `Wiki fetch failed ${response.status}`;
+    const summary: any = await response.json();
+    return `Wikipedia: ${summary.title}\n${summary.extract}\nSource: ${summary.content_urls?.desktop?.page || url}`;
+  } catch (error: any) {
+    return `Wiki error: ${error.message}`;
+  }
 }
 
-export async function duckDuckGo(q: string): Promise<string> {
+export async function searchDuckDuckGo(query: string): Promise<string> {
   try {
-    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1&skip_disambig=1`;
-    const res = await fetch(url);
-    const j: any = await res.json();
-    const topics = (j.RelatedTopics || []).slice(0,3).map((t:any)=> t.Text || t.Result).join('\n');
-    return `DuckDuckGo: ${j.AbstractText || 'No abstract'}\n${topics}\nSource: ${j.AbstractURL || 'https://duckduckgo.com'}`;
-  } catch (e:any){ return `DDG error: ${e.message}`; }
+    const result = await fetchJson(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
+    );
+    const topics = (result.RelatedTopics || [])
+      .slice(0, RELATED_TOPICS_LIMIT)
+      .map((topic: any) => topic.Text || topic.Result)
+      .join('\n');
+    return `DuckDuckGo: ${result.AbstractText || 'No abstract'}\n${topics}\nSource: ${result.AbstractURL || 'https://duckduckgo.com'}`;
+  } catch (error: any) {
+    return `DDG error: ${error.message}`;
+  }
 }
 
-export async function openMeteoWeather(lat: number, lon: number): Promise<string> {
+export async function fetchWeatherForecast(latitude: number, longitude: number): Promise<string> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
-    const res = await fetch(url);
-    const j:any = await res.json();
-    return `Weather (${lat},${lon}): now ${j.current?.temperature_2m}°C wind ${j.current?.wind_speed_10m} km/h, today max ${j.daily?.temperature_2m_max?.[0]} min ${j.daily?.temperature_2m_min?.[0]} Source: open-meteo.com`;
-  } catch(e:any){ return `Weather error: ${e.message}`; }
+    const forecast = await fetchJson(
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+        '&current=temperature_2m,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto'
+    );
+    return (
+      `Weather (${latitude},${longitude}): now ${forecast.current?.temperature_2m}°C ` +
+      `wind ${forecast.current?.wind_speed_10m} km/h, today max ${forecast.daily?.temperature_2m_max?.[0]} ` +
+      `min ${forecast.daily?.temperature_2m_min?.[0]} Source: open-meteo.com`
+    );
+  } catch (error: any) {
+    return `Weather error: ${error.message}`;
+  }
 }
 
-export async function hackerNewsTop(): Promise<string> {
+export async function fetchHackerNewsTopStories(): Promise<string> {
   try {
-    const ids:any = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json').then(r=>r.json());
-    const top = ids.slice(0,5);
-    const items = await Promise.all(top.map((id:number)=> fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json())));
-    return `HackerNews Top 5:\n` + items.map((it:any,i:number)=> `${i+1}. ${it.title} (${it.url || ''}) score:${it.score}`).join('\n') + `\nSource: hacker-news.firebaseio.com`;
-  } catch(e:any){ return `HN error: ${e.message}`; }
+    const ids: number[] = await fetchJson('https://hacker-news.firebaseio.com/v0/topstories.json');
+    const stories = await Promise.all(
+      ids.slice(0, TOP_STORIES_LIMIT).map((id) => fetchJson(`https://hacker-news.firebaseio.com/v0/item/${id}.json`))
+    );
+    const lines = stories.map((story: any, index) => `${index + 1}. ${story.title} (${story.url || ''}) score:${story.score}`);
+    return `HackerNews Top ${TOP_STORIES_LIMIT}:\n${lines.join('\n')}\nSource: hacker-news.firebaseio.com`;
+  } catch (error: any) {
+    return `HN error: ${error.message}`;
+  }
 }
 
-export async function fetchUrl(url: string): Promise<string> {
+/** Fetches a page and returns its visible text, tags stripped, truncated. */
+export async function fetchPageText(url: string): Promise<string> {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'aichatbot/1.0' } });
-    const text = await res.text();
-    const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g,' ').slice(0,8000);
-    return `Fetch ${url} (${res.status}):\n${snippet}\nSource: ${url}`;
-  } catch(e:any){ return `Fetch error: ${e.message}`; }
+    const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const html = await response.text();
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, PAGE_TEXT_LIMIT);
+    return `Fetch ${url} (${response.status}):\n${text}\nSource: ${url}`;
+  } catch (error: any) {
+    return `Fetch error: ${error.message}`;
+  }
 }
 
+async function geocodeCity(city: string): Promise<{ latitude: number; longitude: number } | null> {
+  const result = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+  const match = result.results?.[0];
+  return match ? { latitude: match.latitude, longitude: match.longitude } : null;
+}
+
+/** Picks the sources that fit the query and joins their output into one context block. */
 export async function collectWebContext(query: string): Promise<string> {
-  const lower = query.toLowerCase();
-  const parts: string[] = [];
-  // Heuristic: weather
-  if (/weather|temperature|forecast/.test(lower)) {
-    // default to London if no coords parsed
-    const m = lower.match(/in\s+([a-z]+)/);
-    // simple geocode via open-meteo geocoding free
-    try {
-      if (m) {
-        const city = m[1];
-        const geo:any = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`).then(r=>r.json());
-        const r = geo.results?.[0];
-        if (r) parts.push(await openMeteoWeather(r.latitude, r.longitude));
-      } else {
-        parts.push(await openMeteoWeather(51.5, -0.12)); // London
-      }
-    } catch {}
-  }
-  if (/news|hacker|tech news/.test(lower)) {
-    parts.push(await hackerNewsTop());
-  }
-  // extract url if present
-  const urlMatch = query.match(/https?:\/\/\S+/);
-  if (urlMatch) parts.push(await fetchUrl(urlMatch[0]));
+  const lowerQuery = query.toLowerCase();
+  const sections: string[] = [];
 
-  // fallback: wiki + ddg for general queries (free)
-  if (parts.length===0) {
-    // use first 4 words as wiki query
-    const q = query.split(' ').slice(0,5).join(' ');
-    parts.push(await wikiSummary(q));
-    parts.push(await duckDuckGo(query));
+  if (/weather|temperature|forecast/.test(lowerQuery)) {
+    try {
+      const cityMatch = lowerQuery.match(/in\s+([a-z]+)/);
+      const coordinates = cityMatch ? await geocodeCity(cityMatch[1]) : DEFAULT_COORDINATES;
+      if (coordinates) sections.push(await fetchWeatherForecast(coordinates.latitude, coordinates.longitude));
+    } catch {
+      // Weather is best-effort.
+    }
   }
-  return parts.join('\n\n---\n\n');
+
+  if (/news|hacker|tech news/.test(lowerQuery)) {
+    sections.push(await fetchHackerNewsTopStories());
+  }
+
+  const urlMatch = query.match(/https?:\/\/\S+/);
+  if (urlMatch) sections.push(await fetchPageText(urlMatch[0]));
+
+  if (sections.length === 0) {
+    const wikiQuery = query.split(' ').slice(0, WIKI_QUERY_WORD_LIMIT).join(' ');
+    sections.push(await fetchWikipediaSummary(wikiQuery));
+    sections.push(await searchDuckDuckGo(query));
+  }
+
+  return sections.join('\n\n---\n\n');
 }

@@ -1,38 +1,46 @@
 import { Request, Response, NextFunction } from 'express';
-import { createError } from './errorHandler';
+import { createHttpError } from './errorHandler';
 
-interface Bucket { count: number; resetTime: number }
+interface RateLimitBucket {
+  count: number;
+  resetTime: number;
+}
 
-const rateLimitStore = new Map<string, Bucket>();
+const buckets = new Map<string, RateLimitBucket>();
 
 const SWEEP_INTERVAL_MS = 60_000;
 
 // Without eviction the map grows unbounded, one entry per client IP forever.
-const sweep = setInterval(() => {
+const sweepTimer = setInterval(() => {
   const now = Date.now();
-  for (const [key, bucket] of rateLimitStore) {
-    if (now > bucket.resetTime) rateLimitStore.delete(key);
+  for (const [key, bucket] of buckets) {
+    if (now > bucket.resetTime) buckets.delete(key);
   }
 }, SWEEP_INTERVAL_MS);
-sweep.unref();
+sweepTimer.unref();
 
-export function rateLimiter(maxRequests = 60, windowMs = 60000) {
+function getClientKey(req: Request): string {
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+/** Fixed-window, in-memory limiter keyed by client IP. */
+export function createRateLimiter(maxRequests = 60, windowMs = 60_000) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = getClientKey(req);
     const now = Date.now();
-    const record = rateLimitStore.get(ip);
+    const bucket = buckets.get(key);
 
-    if (!record || now > record.resetTime) {
-      rateLimitStore.set(ip, { count: 1, resetTime: now + windowMs });
+    if (!bucket || now > bucket.resetTime) {
+      buckets.set(key, { count: 1, resetTime: now + windowMs });
       return next();
     }
 
-    if (record.count >= maxRequests) {
-      res.setHeader('Retry-After', Math.ceil((record.resetTime - now) / 1000));
-      return next(createError('Too many requests. Please try again later.', 429, 'RATE_LIMITED'));
+    if (bucket.count >= maxRequests) {
+      res.setHeader('Retry-After', Math.ceil((bucket.resetTime - now) / 1000));
+      return next(createHttpError('Too many requests. Please try again later.', 429, 'RATE_LIMITED'));
     }
 
-    record.count++;
+    bucket.count += 1;
     next();
   };
 }

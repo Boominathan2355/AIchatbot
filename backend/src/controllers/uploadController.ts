@@ -1,31 +1,34 @@
 import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { sendSuccess, sendError } from '../utils/apiResponse';
-import { getMimeType, getFileExtension } from '../utils/fileHelpers';
-import { config } from '../config/env';
+import { randomUUID } from 'crypto';
+import { config } from '../config/environment';
+import { getFileExtension, getMimeType } from '../utils/fileHelpers';
+import { sendData, sendError } from '../utils/apiResponse';
 
-export async function handleUpload(req: Request, res: Response) {
-  if (!req.file) {
-    return sendError(res, 'No file uploaded', 400, 'NO_FILE');
-  }
-
+/** POST /api/upload - accepts one file and returns it as a base64 attachment payload. */
+export async function uploadAttachment(req: Request, res: Response): Promise<void> {
   const file = req.file;
-  const fileType = getFileExtension(file.originalname);
+  if (!file) {
+    sendError(res, 400, 'No file uploaded', 'NO_FILE');
+    return;
+  }
 
   if (file.size > config.maxFileSize) {
-    return sendError(res, `File too large. Maximum size is ${config.maxFileSize / 1024 / 1024}MB`, 413, 'FILE_TOO_LARGE');
+    sendError(res, 413, `File too large. Maximum size is ${config.maxFileSize / 1024 / 1024}MB`, 'FILE_TOO_LARGE');
+    return;
   }
 
-  const base64Data = file.buffer.toString('base64');
+  const fileType = getFileExtension(file.originalname);
 
-  const attachment = {
-    id: uuidv4(),
-    fileName: file.originalname,
-    fileType,
-    fileSize: file.size,
-    mimeType: getMimeType(fileType),
-    base64Data,
-  };
-
-  sendSuccess(res, attachment, 201);
+  sendData(
+    res,
+    {
+      id: randomUUID(),
+      fileName: file.originalname,
+      fileType,
+      fileSize: file.size,
+      mimeType: getMimeType(fileType),
+      base64Data: file.buffer.toString('base64'),
+    },
+    201
+  );
 }

@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 
-export function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
+type AsyncRequestHandler<TRequest extends Request = Request> = (
+  req: TRequest,
+  res: Response,
+  next: NextFunction
+) => Promise<unknown>;
+
+/** Forwards rejected promises from async route handlers to the error middleware. */
+export function asyncHandler<TRequest extends Request = Request>(handler: AsyncRequestHandler<TRequest>) {
   return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
+    Promise.resolve(handler(req as TRequest, res, next)).catch(next);
   };
 }

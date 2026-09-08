@@ -1,24 +1,31 @@
 import { Response } from 'express';
-import { streamChatWithProvider, chatWithProvider, ProviderType } from '../services/providers';
-import { Attachment } from '../services/providers/types';
-import { DEFAULT_GEMINI_MODEL } from '../services/providers/gemini';
-import { createError } from '../middleware/errorHandler';
-import { Conversation } from '../models/Conversation';
-import { AuthRequest } from '../middleware/auth';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { createHttpError } from '../middleware/errorHandler';
+import { config } from '../config/environment';
+import { Conversation } from '../models/conversationModel';
+import { chatWithProvider, streamChatWithProvider } from '../services/providers/providerFactory';
+import { Attachment, ChatMessage, ChatRequest, ProviderType, isProviderType } from '../services/providers/providerTypes';
+import { resolveDefaultModel } from '../services/providers/defaultModels';
 import { collectWebContext } from '../services/webService';
-import { resolveAllowedPath } from '../utils/pathGuard';
-import { config } from '../config/env';
-import fs from 'fs/promises';
+import { listDirectory } from '../services/fileService';
+import { resolveRequestPath } from '../utils/pathGuard';
+import { sendData } from '../utils/apiResponse';
 
-function getDefaultModel(providerType: ProviderType): string {
-  switch (providerType) {
-    case 'chatgpt': return 'gpt-4o-mini';
-    case 'ollama': return 'llama3';
-    case 'llamacpp': return 'default';
-    case 'gemini':
-    default: return DEFAULT_GEMINI_MODEL;
-  }
+interface ChatRequestBody {
+  message: string;
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  attachments?: Attachment[];
+  agentMode: string;
+  conversationId?: string;
+  provider: ProviderType;
 }
+
+const DEFAULT_PROVIDER: ProviderType = 'gemini';
+const DEFAULT_AGENT_MODE = 'chat';
+const TITLE_MAX_LENGTH = 80;
+const FILE_LISTING_LIMIT = 30;
 
 /**
  * Explicit requests to use the local file tools. Deliberately narrow: an
@@ -26,50 +33,69 @@ function getDefaultModel(providerType: ProviderType): string {
  * "which build tool should I use?" injected a fake tool-result block into
  * the prompt.
  */
-const TOOL_REQUEST = /\b(use (the )?(tool|tools|mcp)|list (the )?files?|show (me )?(the )?files?|file[_ ]list|read (the )?director(y|ies)|what files)\b/i;
+const EXPLICIT_TOOL_REQUEST = /\b(use (the )?(tool|tools|mcp)|list (the )?files?|show (me )?(the )?files?|file[_ ]list|read (the )?director(y|ies)|what files)\b/i;
 
-function wantsTool(message: string): boolean {
-  return TOOL_REQUEST.test(message);
+function isExplicitToolRequest(message: string): boolean {
+  return EXPLICIT_TOOL_REQUEST.test(message);
+}
+
+function parseChatRequestBody(body: any): ChatRequestBody {
+  const message = typeof body?.message === 'string' ? body.message : '';
+  if (!message.trim()) {
+    throw createHttpError('Message is required', 400, 'MISSING_MESSAGE');
+  }
+
+  return {
+    message,
+    model: body.model || undefined,
+    apiKey: body.apiKey || undefined,
+    baseUrl: body.baseUrl || undefined,
+    attachments: Array.isArray(body.attachments) ? body.attachments : undefined,
+    agentMode: typeof body.agentMode === 'string' ? body.agentMode : DEFAULT_AGENT_MODE,
+    conversationId: body.conversationId || undefined,
+    provider: isProviderType(body.provider) ? body.provider : DEFAULT_PROVIDER,
+  };
 }
 
 /**
  * Runs the file_list tool when the user explicitly asks for it, and returns a
  * context block for the model. Returns null when no tool call is warranted.
  */
-async function buildToolContext(req: AuthRequest, message: string): Promise<string | null> {
-  if (!wantsTool(message)) return null;
+async function buildFileListingContext(req: AuthenticatedRequest, message: string): Promise<string | null> {
+  if (!isExplicitToolRequest(message)) return null;
 
-  const guard = await resolveAllowedPath(req);
+  const guard = await resolveRequestPath(req);
   if (!guard.ok) {
-    return `[MCP tool file_list was requested but is unavailable: ${guard.message} Tell the user this plainly and, if they are running the server locally, point them at Settings -> Local Access.]`;
+    return `[Tool file_list was requested but is unavailable: ${guard.message} Tell the user this plainly and, if they are running the server locally, point them at Settings -> Local Access.]`;
   }
 
   try {
-    const entries = await fs.readdir(guard.target, { withFileTypes: true });
+    const entries = await listDirectory(guard.target, { withStats: false });
     if (entries.length === 0) {
-      return `[MCP tool file_list ran on ${guard.target} and the directory is empty. You do have tool access; tell the user the directory is empty.]`;
+      return `[Tool file_list ran on ${guard.target} and the directory is empty. You do have tool access; tell the user the directory is empty.]`;
     }
-    const list = entries
-      .slice(0, 30)
-      .map((e) => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`)
+    const listing = entries
+      .slice(0, FILE_LISTING_LIMIT)
+      .map((entry) => `${entry.isDirectory ? '[DIR]' : '[FILE]'} ${entry.name}`)
       .join('\n');
-    return `[MCP tool file_list ran on ${guard.target}. You do have tool access. Result:\n${list}\n---\nPresent this as a markdown bullet list using these exact names.]`;
-  } catch (err: any) {
-    return `[MCP tool file_list failed on ${guard.target}: ${err.message}]`;
+    return `[Tool file_list ran on ${guard.target}. You do have tool access. Result:\n${listing}\n---\nPresent this as a markdown bullet list using these exact names.]`;
+  } catch (error: any) {
+    return `[Tool file_list failed on ${guard.target}: ${error.message}]`;
   }
 }
 
-async function loadHistory(conversationId?: string, userId?: string) {
+async function loadConversationHistory(conversationId?: string, userId?: string): Promise<ChatMessage[]> {
   if (!conversationId || !userId) return [];
+
   try {
-    const conv = await Conversation.findOne({ _id: conversationId, userId }).lean();
-    return (conv?.messages || []).map((m: any) => ({
-      role: m.role,
-      content: m.content,
-      attachments: m.attachments,
+    const conversation = await Conversation.findOne({ _id: conversationId, userId }).lean();
+    return (conversation?.messages || []).map((message) => ({
+      role: message.role,
+      content: message.content,
+      attachments: message.attachments as Attachment[] | undefined,
     }));
-  } catch (e) {
-    console.error('Failed to load history:', e);
+  } catch (error) {
+    console.error('[chat] failed to load history:', error);
     return [];
   }
 }
@@ -79,20 +105,25 @@ async function loadHistory(conversationId?: string, userId?: string) {
  * Attachments above the configured size are kept as metadata only, so one
  * large upload cannot make a conversation permanently unsaveable.
  */
-function forStorage(attachments?: Attachment[]) {
+function prepareAttachmentsForStorage(attachments?: Attachment[]): Attachment[] | undefined {
   if (!attachments?.length) return undefined;
-  return attachments.map((a) => {
-    const bytes = a.base64Data ? Math.floor((a.base64Data.length * 3) / 4) : 0;
+
+  return attachments.map((attachment) => {
+    const bytes = attachment.base64Data ? Math.floor((attachment.base64Data.length * 3) / 4) : 0;
     if (bytes > config.maxStoredAttachmentBytes) {
-      const { base64Data, ...meta } = a;
-      return meta;
+      const { base64Data: _dropped, ...metadata } = attachment;
+      return metadata;
     }
-    return a;
+    return attachment;
   });
 }
 
-/** Returns an error message if persistence failed, otherwise null. */
-async function persistExchange(
+function buildConversationTitle(firstMessage: string): string {
+  return firstMessage.slice(0, TITLE_MAX_LENGTH) + (firstMessage.length > TITLE_MAX_LENGTH ? '...' : '');
+}
+
+/** Appends the user/assistant pair to the conversation. Returns an error message on failure, otherwise null. */
+async function persistMessageExchange(
   conversationId: string | undefined,
   userId: string | undefined,
   userContent: string,
@@ -105,124 +136,113 @@ async function persistExchange(
     const conversation = await Conversation.findOne({ _id: conversationId, userId });
     if (!conversation) return null;
 
-    if (conversation.messages.filter((m: any) => m.role === 'user').length === 0) {
-      conversation.title = userContent.slice(0, 80) + (userContent.length > 80 ? '...' : '');
+    const isFirstUserMessage = !conversation.messages.some((message) => message.role === 'user');
+    if (isFirstUserMessage) {
+      conversation.title = buildConversationTitle(userContent);
     }
 
     conversation.messages.push(
-      { role: 'user', content: userContent, attachments: forStorage(attachments), createdAt: new Date() } as any,
-      { role: 'assistant', content: assistantContent, createdAt: new Date() } as any
+      { role: 'user', content: userContent, attachments: prepareAttachmentsForStorage(attachments), createdAt: new Date() },
+      { role: 'assistant', content: assistantContent, createdAt: new Date() }
     );
 
     await conversation.save();
     return null;
-  } catch (dbError: any) {
-    console.error('Failed to save conversation:', dbError);
-    return dbError?.message || 'Failed to save conversation';
+  } catch (error: any) {
+    console.error('[chat] failed to save conversation:', error);
+    return error?.message || 'Failed to save conversation';
   }
 }
 
-async function buildEnrichedMessage(req: AuthRequest, message: string, agentMode: string): Promise<string> {
-  const parts = [message];
+/** Adds realtime web context (web mode) and explicit tool output to the user's message. */
+async function enrichUserMessage(req: AuthenticatedRequest, message: string, agentMode: string): Promise<string> {
+  const sections = [message];
 
   if (agentMode === 'web') {
     try {
       const webContext = await collectWebContext(message);
-      if (webContext) parts.push(`[Realtime web context (free APIs) - cite sources]:\n${webContext}`);
-    } catch (e) {
-      console.error('web collect failed', e);
+      if (webContext) sections.push(`[Realtime web context (free APIs) - cite sources]:\n${webContext}`);
+    } catch (error) {
+      console.error('[chat] web context failed:', error);
     }
   }
 
-  const toolContext = await buildToolContext(req, message);
-  if (toolContext) parts.push(toolContext);
+  const toolContext = await buildFileListingContext(req, message);
+  if (toolContext) sections.push(toolContext);
 
-  return parts.join('\n\n');
+  return sections.join('\n\n');
 }
 
-export async function handleChat(req: AuthRequest, res: Response) {
-  const { message, model, apiKey, attachments, agentMode = 'chat', conversationId, provider = 'gemini', baseUrl } = req.body;
+async function buildProviderRequest(req: AuthenticatedRequest, body: ChatRequestBody): Promise<ChatRequest> {
+  const history = await loadConversationHistory(body.conversationId, req.userId);
+  const content = await enrichUserMessage(req, body.message, body.agentMode);
 
-  if (!message || message.trim().length === 0) {
-    throw createError('Message is required', 400, 'MISSING_MESSAGE');
-  }
+  return {
+    messages: [...history, { role: 'user', content, attachments: body.attachments }],
+    model: body.model || resolveDefaultModel(body.provider),
+    agentMode: body.agentMode,
+    providerConfig: { type: body.provider, apiKey: body.apiKey, baseUrl: body.baseUrl },
+  };
+}
 
+function beginEventStream(res: Response): void {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+}
 
-  let fullResponse = '';
+function writeEvent(res: Response, payload: Record<string, unknown>): void {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+/** POST /api/chat - streams the assistant reply as server-sent events. */
+export async function streamChatCompletion(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const body = parseChatRequestBody(req.body);
+
+  beginEventStream(res);
+
+  let assistantContent = '';
 
   try {
-    const history = await loadHistory(conversationId, req.userId);
-    const enrichedMessage = await buildEnrichedMessage(req, message, agentMode);
-
-    const chatMessages: any[] = [
-      ...history,
-      { role: 'user' as const, content: enrichedMessage, attachments: attachments as Attachment[] | undefined, agentMode },
-    ];
-    (chatMessages as any).agentMode = agentMode;
-
-    const providerType = provider as ProviderType;
+    const providerRequest = await buildProviderRequest(req, body);
 
     // The client can abort mid-stream; stop pulling from the provider then.
     let aborted = false;
-    req.on('close', () => { aborted = true; });
-
-    const stream = streamChatWithProvider({
-      messages: chatMessages as any,
-      model: model || getDefaultModel(providerType),
-      config: { type: providerType, apiKey: apiKey || undefined, baseUrl: baseUrl || undefined },
-      providerType,
+    req.on('close', () => {
+      aborted = true;
     });
 
-    for await (const chunk of stream) {
+    for await (const chunk of streamChatWithProvider(providerRequest)) {
       if (aborted) break;
-      fullResponse += chunk;
-      res.write(`data: ${JSON.stringify({ content: chunk, done: false })}\n\n`);
+      assistantContent += chunk;
+      writeEvent(res, { content: chunk, done: false });
     }
 
-    const saveError = await persistExchange(conversationId, req.userId, message, fullResponse, attachments);
+    const saveError = await persistMessageExchange(body.conversationId, req.userId, body.message, assistantContent, body.attachments);
 
-    if (aborted) { res.end(); return; }
+    if (aborted) {
+      res.end();
+      return;
+    }
 
-    res.write(`data: ${JSON.stringify({ content: '', done: true, ...(saveError ? { saveError } : {}) })}\n\n`);
+    writeEvent(res, { content: '', done: true, ...(saveError ? { saveError } : {}) });
     res.end();
   } catch (error: any) {
-    console.error('Chat error:', error);
-    res.write(`data: ${JSON.stringify({ error: error.message || 'Failed to generate response', done: true })}\n\n`);
+    console.error('[chat] stream failed:', error);
+    writeEvent(res, { error: error.message || 'Failed to generate response', done: true });
     res.end();
   }
 }
 
-export async function handleChatNonStream(req: AuthRequest, res: Response) {
-  const { message, model, apiKey, attachments, agentMode = 'chat', conversationId, provider = 'gemini', baseUrl } = req.body;
+/** POST /api/chat/non-stream - returns the whole reply in one JSON response. */
+export async function createChatCompletion(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const body = parseChatRequestBody(req.body);
+  const providerRequest = await buildProviderRequest(req, body);
 
-  if (!message || message.trim().length === 0) {
-    throw createError('Message is required', 400, 'MISSING_MESSAGE');
-  }
+  const response = await chatWithProvider(providerRequest);
+  const saveError = await persistMessageExchange(body.conversationId, req.userId, body.message, response.content, body.attachments);
 
-  const history = await loadHistory(conversationId, req.userId);
-  const enrichedMessage = await buildEnrichedMessage(req, message, agentMode);
-
-  const chatMessages: any[] = [
-    ...history,
-    { role: 'user' as const, content: enrichedMessage, attachments: attachments as Attachment[] | undefined, agentMode },
-  ];
-  (chatMessages as any).agentMode = agentMode;
-
-  const providerType = provider as ProviderType;
-  const response = await chatWithProvider({
-    messages: chatMessages as any,
-    model: model || getDefaultModel(providerType),
-    config: { type: providerType, apiKey: apiKey || undefined, baseUrl: baseUrl || undefined },
-    providerType,
-  });
-
-  // The streaming path persists its exchange; this one used to drop it.
-  const saveError = await persistExchange(conversationId, req.userId, message, response.content, attachments);
-
-  res.json({ success: true, data: { content: response.content, ...(saveError ? { saveError } : {}) } });
+  sendData(res, { content: response.content, ...(saveError ? { saveError } : {}) });
 }

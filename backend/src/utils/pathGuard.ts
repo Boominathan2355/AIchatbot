@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { Request } from 'express';
-import { config } from '../config/env';
+import { config } from '../config/environment';
 
 export interface PathDenied {
   ok: false;
@@ -15,9 +15,11 @@ export interface PathAllowed {
   base: string;
 }
 
-export type PathResult = PathAllowed | PathDenied;
+export type PathGuardResult = PathAllowed | PathDenied;
 
-function contains(base: string, target: string): boolean {
+const ALLOWED_PATH_HEADER = 'x-allowed-path';
+
+function isPathWithin(base: string, target: string): boolean {
   return target === base || target.startsWith(base + path.sep);
 }
 
@@ -26,7 +28,7 @@ function contains(base: string, target: string): boolean {
  * symlink inside the allowed base cannot point outside it. Paths that do not
  * exist yet (a file about to be written) resolve through their parent.
  */
-async function realPathOrNearest(target: string): Promise<string> {
+async function resolveRealPath(target: string): Promise<string> {
   let current = target;
   const trailing: string[] = [];
 
@@ -48,9 +50,9 @@ async function realPathOrNearest(target: string): Promise<string> {
  * server-configured base, never widen it, so it is not a security boundary
  * on its own - the server root is.
  */
-function getClientBase(req: Request): string | null {
+export function readClientAllowedPath(req: Request): string | null {
   const raw =
-    (req.headers['x-allowed-path'] as string) ||
+    (req.headers[ALLOWED_PATH_HEADER] as string) ||
     (req.query?.allowedPath as string) ||
     (req.body?.allowedPath as string) ||
     '';
@@ -63,7 +65,10 @@ function getClientBase(req: Request): string | null {
  * Denies when ALLOWED_BASE_PATH is unset - local access is opt-in by the
  * operator, and an absent boundary must never mean "no restriction".
  */
-export async function resolveAllowedPath(req: Request, requestedPath?: string): Promise<PathResult> {
+export async function resolveAllowedPath(
+  requestedPath?: string,
+  clientAllowedPath?: string | null
+): Promise<PathGuardResult> {
   if (!config.allowedBasePath) {
     return {
       ok: false,
@@ -73,27 +78,27 @@ export async function resolveAllowedPath(req: Request, requestedPath?: string): 
     };
   }
 
-  const serverRoot = await realPathOrNearest(path.resolve(config.allowedBasePath));
+  const serverRoot = await resolveRealPath(path.resolve(config.allowedBasePath));
 
-  const clientBase = getClientBase(req);
   let base = serverRoot;
-  if (clientBase) {
-    const resolvedClientBase = await realPathOrNearest(clientBase);
-    if (!contains(serverRoot, resolvedClientBase)) {
-      return {
-        ok: false,
-        status: 403,
-        message: 'Allowed Path is outside the directory this server permits.',
-      };
+  if (clientAllowedPath) {
+    const resolvedClientBase = await resolveRealPath(clientAllowedPath);
+    if (!isPathWithin(serverRoot, resolvedClientBase)) {
+      return { ok: false, status: 403, message: 'Allowed Path is outside the directory this server permits.' };
     }
     base = resolvedClientBase;
   }
 
-  const target = requestedPath ? await realPathOrNearest(path.resolve(requestedPath)) : base;
+  const target = requestedPath ? await resolveRealPath(path.resolve(requestedPath)) : base;
 
-  if (!contains(base, target)) {
+  if (!isPathWithin(base, target)) {
     return { ok: false, status: 403, message: 'Path not allowed.' };
   }
 
   return { ok: true, target, base };
+}
+
+/** Convenience for controllers: resolves using the client's Allowed Path from the request. */
+export function resolveRequestPath(req: Request, requestedPath?: string): Promise<PathGuardResult> {
+  return resolveAllowedPath(requestedPath, readClientAllowedPath(req));
 }

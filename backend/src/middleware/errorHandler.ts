@@ -1,33 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
-import { config } from '../config/env';
+import { config } from '../config/environment';
 
-export interface AppError extends Error {
+export interface HttpError extends Error {
   statusCode?: number;
   code?: string;
 }
 
-export function errorHandler(err: AppError, req: Request, res: Response, next: NextFunction) {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+export function createHttpError(message: string, statusCode: number = 500, code?: string): HttpError {
+  const error = new Error(message) as HttpError;
+  error.statusCode = statusCode;
+  error.code = code;
+  return error;
+}
 
-  console.error(`[Error] ${req.method} ${req.path}:`, message);
+export function errorHandler(error: HttpError, req: Request, res: Response, _next: NextFunction): void {
+  const statusCode = error.statusCode || 500;
+  const message = error.message || 'Internal Server Error';
 
-  if (statusCode === 500 && config.nodeEnv === 'development') {
-    console.error(err.stack);
+  console.error(`[error] ${req.method} ${req.path}:`, message);
+  if (statusCode === 500 && !config.isProduction) {
+    console.error(error.stack);
   }
 
   res.status(statusCode).json({
     error: {
       message,
-      code: err.code || 'INTERNAL_ERROR',
-      ...(config.nodeEnv === 'development' && { stack: err.stack }),
+      code: error.code || 'INTERNAL_ERROR',
+      ...(!config.isProduction && { stack: error.stack }),
     },
   });
-}
-
-export function createError(message: string, statusCode: number = 500, code?: string): AppError {
-  const error = new Error(message) as AppError;
-  error.statusCode = statusCode;
-  error.code = code;
-  return error;
 }

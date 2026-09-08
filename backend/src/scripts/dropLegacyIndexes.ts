@@ -9,30 +9,30 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import mongoose from 'mongoose';
-import { connectDB } from '../config/db';
+import { connectDatabase, disconnectDatabase } from '../config/database';
 
 const LEGACY_INDEXES = ['email_1', 'usernameHash_1'];
 
-async function main() {
-  await connectDB();
+async function dropLegacyIndexes(): Promise<void> {
+  await connectDatabase();
 
-  const db = mongoose.connection.db;
-  if (!db) throw new Error('No database handle after connect');
+  const database = mongoose.connection.db;
+  if (!database) throw new Error('No database handle after connect');
 
-  const users = db.collection('users');
-  for (const index of LEGACY_INDEXES) {
+  const users = database.collection('users');
+  for (const indexName of LEGACY_INDEXES) {
     try {
-      await users.dropIndex(index);
-      console.log(`Dropped index ${index}`);
+      await users.dropIndex(indexName);
+      console.log(`Dropped index ${indexName}`);
     } catch {
-      console.log(`Index ${index} not present, skipping`);
+      console.log(`Index ${indexName} not present, skipping`);
     }
   }
 
-  await mongoose.disconnect();
+  await disconnectDatabase();
 }
 
-main().catch((err) => {
-  console.error('Migration failed:', err);
+dropLegacyIndexes().catch((error) => {
+  console.error('Migration failed:', error);
   process.exit(1);
 });

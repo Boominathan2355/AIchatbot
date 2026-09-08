@@ -1,97 +1,98 @@
+import { randomUUID } from 'crypto';
 import { Response } from 'express';
-import { Conversation } from '../models/Conversation';
-import { AuthRequest } from '../middleware/auth';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { Conversation } from '../models/conversationModel';
+import { sendData, sendError } from '../utils/apiResponse';
 
-export const getConversations = async (req: AuthRequest, res: Response): Promise<void> => {
+const CONVERSATION_LIST_LIMIT = 100;
+const DEFAULT_TITLE = 'New Chat';
+const DEFAULT_AGENT_MODE = 'chat';
+
+function toConversationSummary(conversation: any) {
+  const messages = conversation.messages || [];
+  const lastMessage = messages[messages.length - 1];
+  return {
+    id: conversation._id,
+    title: conversation.title,
+    agentMode: conversation.agentMode,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    messageCount: messages.length,
+    lastMessage: lastMessage ? { content: lastMessage.content } : undefined,
+  };
+}
+
+function toMessageResponse(message: any) {
+  return {
+    id: message._id?.toString() || randomUUID(),
+    role: message.role,
+    content: message.content,
+    attachments: message.attachments,
+    createdAt: message.createdAt,
+    timestamp: message.createdAt,
+  };
+}
+
+function toConversationDetail(conversation: any) {
+  return {
+    id: conversation._id,
+    title: conversation.title,
+    agentMode: conversation.agentMode,
+    messages: (conversation.messages || []).map(toMessageResponse),
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+  };
+}
+
+export async function listConversations(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const conversations = await Conversation.find({ userId: req.userId })
       .sort({ updatedAt: -1 })
-      .limit(100)
+      .limit(CONVERSATION_LIST_LIMIT)
       .lean();
 
-    res.json({
-      data: conversations.map((c) => ({
-        id: c._id,
-        title: c.title,
-        agentMode: c.agentMode,
-        createdAt: (c as any).createdAt,
-        updatedAt: c.updatedAt,
-        messageCount: c.messages?.length || 0,
-        lastMessage: c.messages?.length
-          ? { content: c.messages[c.messages.length - 1].content }
-          : undefined,
-      })),
-    });
+    sendData(res, conversations.map(toConversationSummary));
   } catch (error) {
-    console.error('Error fetching conversations:', error);
-    res.status(500).json({ error: { message: 'Failed to fetch conversations' } });
+    console.error('[conversations] list failed:', error);
+    sendError(res, 500, 'Failed to fetch conversations');
   }
-};
+}
 
-export const getConversation = async (req: AuthRequest, res: Response): Promise<void> => {
+export async function getConversation(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const conversation = await Conversation.findOne({ _id: req.params.id, userId: req.userId }).lean();
-
     if (!conversation) {
-      res.status(404).json({ error: { message: 'Conversation not found' } });
+      sendError(res, 404, 'Conversation not found');
       return;
     }
-
-    res.json({
-      data: {
-        id: conversation._id,
-        title: conversation.title,
-        agentMode: conversation.agentMode,
-        messages: conversation.messages.map((m: any) => ({
-          id: m._id?.toString() || Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
-          role: m.role,
-          content: m.content,
-          attachments: m.attachments,
-          createdAt: m.createdAt,
-          timestamp: m.createdAt,
-        })),
-        createdAt: (conversation as any).createdAt,
-        updatedAt: (conversation as any).updatedAt,
-      },
-    });
+    sendData(res, toConversationDetail(conversation));
   } catch (error) {
-    console.error('Error fetching conversation:', error);
-    res.status(500).json({ error: { message: 'Failed to fetch conversation' } });
+    console.error('[conversations] get failed:', error);
+    sendError(res, 500, 'Failed to fetch conversation');
   }
-};
+}
 
-export const createConversation = async (req: AuthRequest, res: Response): Promise<void> => {
+export async function createConversation(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const conversation = new Conversation({
+    const conversation = await new Conversation({
       userId: req.userId,
-      title: 'New Chat',
-      agentMode: req.body.agentMode || 'chat',
-    });
-    await conversation.save();
+      title: DEFAULT_TITLE,
+      agentMode: req.body?.agentMode || DEFAULT_AGENT_MODE,
+    }).save();
 
-    res.status(201).json({
-      data: {
-        id: conversation._id,
-        title: conversation.title,
-        agentMode: conversation.agentMode,
-        createdAt: (conversation as any).createdAt,
-        updatedAt: (conversation as any).updatedAt,
-        messageCount: 0,
-      },
-    });
+    sendData(res, toConversationSummary(conversation), 201);
   } catch (error) {
-    console.error('Error creating conversation:', error);
-    res.status(500).json({ error: { message: 'Failed to create conversation' } });
+    console.error('[conversations] create failed:', error);
+    sendError(res, 500, 'Failed to create conversation');
   }
-};
+}
 
-export const updateConversation = async (req: AuthRequest, res: Response): Promise<void> => {
+export async function updateConversation(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { title, messages, agentMode } = req.body;
+    const { title, messages, agentMode } = req.body ?? {};
     const conversation = await Conversation.findOne({ _id: req.params.id, userId: req.userId });
-
     if (!conversation) {
-      res.status(404).json({ error: { message: 'Conversation not found' } });
+      sendError(res, 404, 'Conversation not found');
       return;
     }
 
@@ -101,31 +102,23 @@ export const updateConversation = async (req: AuthRequest, res: Response): Promi
 
     await conversation.save();
 
-    res.json({
-      data: {
-        id: conversation._id,
-        title: conversation.title,
-        agentMode: conversation.agentMode,
-      },
-    });
+    sendData(res, { id: conversation._id, title: conversation.title, agentMode: conversation.agentMode });
   } catch (error) {
-    console.error('Error updating conversation:', error);
-    res.status(500).json({ error: { message: 'Failed to update conversation' } });
+    console.error('[conversations] update failed:', error);
+    sendError(res, 500, 'Failed to update conversation');
   }
-};
+}
 
-export const deleteConversation = async (req: AuthRequest, res: Response): Promise<void> => {
+export async function deleteConversation(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const conversation = await Conversation.findOneAndDelete({ _id: req.params.id, userId: req.userId });
-
     if (!conversation) {
-      res.status(404).json({ error: { message: 'Conversation not found' } });
+      sendError(res, 404, 'Conversation not found');
       return;
     }
-
-    res.json({ message: 'Conversation deleted' });
+    sendData(res, { id: conversation._id, deleted: true });
   } catch (error) {
-    console.error('Error deleting conversation:', error);
-    res.status(500).json({ error: { message: 'Failed to delete conversation' } });
+    console.error('[conversations] delete failed:', error);
+    sendError(res, 500, 'Failed to delete conversation');
   }
-};
+}
