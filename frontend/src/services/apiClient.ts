@@ -1,87 +1,116 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { Attachment, AuthResponse, AuthUser, Conversation, ModelInfo, ToolDefinition } from '../types';
 
-class ApiService {
-  private apiKey: string = '';
-  private authToken: string = '';
-  private allowedPath: string = '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const CONNECTION_ERROR = 'Cannot connect to backend server. Make sure it is running on port 3001.';
 
-  setApiKey(key: string) {
-    this.apiKey = key;
+interface DataEnvelope<T> {
+  data: T;
+}
+
+interface StreamEvent {
+  content?: string;
+  done?: boolean;
+  error?: string;
+  saveError?: string;
+}
+
+interface CreateConversationInput {
+  title?: string;
+  model?: string;
+  agentMode?: string;
+}
+
+/**
+ * Thin fetch wrapper for the backend API. Holds the auth token and the
+ * user's provider key / allowed path so every request carries them.
+ */
+class ApiClient {
+  private providerApiKey = '';
+  private authToken = '';
+  private allowedPath = '';
+
+  setProviderApiKey(key: string): void {
+    this.providerApiKey = key;
   }
 
-  setAuthToken(token: string) {
+  setAuthToken(token: string): void {
     this.authToken = token;
   }
 
-  setAllowedPath(p: string) {
-    this.allowedPath = p;
+  setAllowedPath(allowedPath: string): void {
+    this.allowedPath = allowedPath;
   }
 
-  private getAuthHeaders(includeProviderKey = false): Record<string, string> {
+  private buildHeaders(includeProviderKey = false): Record<string, string> {
     const headers: Record<string, string> = {};
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
-    }
-    if (this.allowedPath) {
-      headers['X-Allowed-Path'] = this.allowedPath;
-    }
+    if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
+    if (this.allowedPath) headers['X-Allowed-Path'] = this.allowedPath;
     // Sent as a header rather than a query parameter so the key never lands
     // in access logs or browser history.
-    if (includeProviderKey && this.apiKey) {
-      headers['X-Provider-Key'] = this.apiKey;
-    }
+    if (includeProviderKey && this.providerApiKey) headers['X-Provider-Key'] = this.providerApiKey;
     return headers;
   }
 
-  private async safeFetch(url: string, options?: RequestInit): Promise<any> {
+  private jsonHeaders(): Record<string, string> {
+    return { 'Content-Type': 'application/json', ...this.buildHeaders() };
+  }
+
+  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    let response: Response;
     try {
-      const headers = {
-        ...this.getAuthHeaders(),
-        ...(options?.headers || {}),
-      };
-      const response = await fetch(url, { ...options, headers });
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}` } }));
-        throw new Error(error.error?.message || `Request failed with status ${response.status}`);
-      }
-      return await response.json();
-    } catch (err: any) {
-      if (err.name === 'TypeError' && err.message.includes('fetch')) {
-        throw new Error('Cannot connect to backend server. Make sure it is running on port 3001.');
-      }
-      throw err;
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers: { ...this.buildHeaders(), ...(options.headers || {}) },
+      });
+    } catch (error: any) {
+      if (error?.name === 'AbortError') throw error;
+      throw new Error(CONNECTION_ERROR);
     }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error?.message || `Request failed with status ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  private async requestData<T>(path: string, options?: RequestInit): Promise<T> {
+    const envelope = await this.request<DataEnvelope<T>>(path, options);
+    return envelope.data;
   }
 
   // Auth
-  async login(login: string, password: string): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/auth/login`, {
+
+  login(login: string, password: string): Promise<AuthResponse> {
+    return this.requestData<AuthResponse>('/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.jsonHeaders(),
       body: JSON.stringify({ login, password }),
     });
-    return result;
   }
 
-  async register(username: string, password: string): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/auth/register`, {
+  register(username: string, password: string): Promise<AuthResponse> {
+    return this.requestData<AuthResponse>('/auth/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.jsonHeaders(),
       body: JSON.stringify({ username, password }),
     });
-    return result;
   }
 
-  async getProfile(): Promise<any> {
-    return this.safeFetch(`${API_BASE}/auth/profile`);
+  async getCurrentUser(): Promise<AuthUser> {
+    const { user } = await this.requestData<{ user: AuthUser }>('/auth/profile');
+    return user;
   }
 
   // Chat
-  async chatStream(
+
+  /** Opens a streaming chat completion and returns a stream of text chunks. */
+  async streamChat(
     message: string,
     model: string,
     agentMode: string,
-    attachments?: any[],
+    attachments?: Attachment[],
     conversationId?: string,
     provider: string = 'gemini',
     baseUrl?: string,
@@ -89,17 +118,14 @@ class ApiService {
   ): Promise<ReadableStream<string>> {
     let response: Response;
     try {
-      response = await fetch(`${API_BASE}/chat`, {
+      response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders(),
-        },
+        headers: this.jsonHeaders(),
         body: JSON.stringify({
           message,
           model,
-          apiKey: this.apiKey || undefined,
+          apiKey: this.providerApiKey || undefined,
           agentMode,
           attachments,
           conversationId,
@@ -107,149 +133,157 @@ class ApiService {
           baseUrl: baseUrl || undefined,
         }),
       });
-    } catch (err: any) {
-      if (err?.name === 'AbortError') throw err;
-      throw new Error('Cannot connect to backend server. Make sure it is running on port 3001.');
+    } catch (error: any) {
+      if (error?.name === 'AbortError') throw error;
+      throw new Error(CONNECTION_ERROR);
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: { message: 'Network error' } }));
-      throw new Error(error.error?.message || 'Failed to send message');
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error?.message || 'Failed to send message');
+    }
+    if (!response.body) {
+      throw new Error('Server returned an empty stream');
     }
 
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
+    return parseEventStream(response.body, signal);
+  }
 
-    return new ReadableStream({
-      async start(controller) {
-        let buffer = '';
-        const onAbort = () => { reader.cancel().catch(() => {}); };
-        signal?.addEventListener('abort', onAbort, { once: true });
-        try {
+  async uploadFile(file: File): Promise<Attachment> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestData<Attachment>('/upload', { method: 'POST', body: formData });
+  }
+
+  async listModels(provider: string = 'gemini', baseUrl?: string): Promise<ModelInfo[]> {
+    const params = new URLSearchParams();
+    if (provider) params.set('provider', provider);
+    if (baseUrl) params.set('baseUrl', baseUrl);
+    const models = await this.requestData<ModelInfo[]>(`/models?${params.toString()}`, {
+      headers: this.buildHeaders(true),
+    });
+    return models || [];
+  }
+
+  // Conversations
+
+  async listConversations(): Promise<Conversation[]> {
+    const conversations = await this.requestData<Conversation[]>('/conversations');
+    return conversations || [];
+  }
+
+  getConversation(id: string): Promise<Conversation> {
+    return this.requestData<Conversation>(`/conversations/${id}`);
+  }
+
+  createConversation(input: CreateConversationInput): Promise<Conversation> {
+    return this.requestData<Conversation>('/conversations', {
+      method: 'POST',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify(input),
+    });
+  }
+
+  updateConversation(id: string, changes: Partial<Pick<Conversation, 'title' | 'agentMode'>>): Promise<Conversation> {
+    return this.requestData<Conversation>(`/conversations/${id}`, {
+      method: 'PATCH',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify(changes),
+    });
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    await this.request(`/conversations/${id}`, { method: 'DELETE' });
+  }
+
+  // Tools
+
+  listTools(): Promise<ToolDefinition[]> {
+    return this.requestData<ToolDefinition[]>('/tools');
+  }
+
+  // Files
+
+  listFiles(directoryPath?: string): Promise<unknown> {
+    const query = directoryPath ? `?path=${encodeURIComponent(directoryPath)}` : '';
+    return this.requestData(`/files/list${query}`);
+  }
+
+  readFile(filePath: string): Promise<unknown> {
+    return this.requestData(`/files/read?path=${encodeURIComponent(filePath)}`);
+  }
+
+  writeFile(filePath: string, content: string): Promise<unknown> {
+    return this.requestData('/files/write', {
+      method: 'POST',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify({ path: filePath, content, allowedPath: this.allowedPath }),
+    });
+  }
+
+  // Git
+
+  getGitStatus(repositoryPath?: string): Promise<unknown> {
+    const query = repositoryPath ? `?path=${encodeURIComponent(repositoryPath)}` : '';
+    return this.requestData(`/git/status${query}`);
+  }
+
+  getGitLog(repositoryPath?: string): Promise<unknown> {
+    const query = repositoryPath ? `?path=${encodeURIComponent(repositoryPath)}` : '';
+    return this.requestData(`/git/log${query}`);
+  }
+}
+
+/** Turns the server's `data: {...}` event stream into a stream of text chunks. */
+function parseEventStream(body: ReadableStream<Uint8Array>, signal?: AbortSignal): ReadableStream<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+
+  return new ReadableStream<string>({
+    async start(controller) {
+      let buffer = '';
+      const onAbort = () => {
+        reader.cancel().catch(() => {});
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+
+      try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
+
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.error) throw new Error(data.error);
-                if (data.content) controller.enqueue(data.content);
-                if (data.done) {
-                  controller.close();
-                  return;
-                }
-              } catch (e) {
-                if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
-                  controller.close();
-                  return;
-                }
-              }
+            if (!line.startsWith('data: ')) continue;
+
+            let event: StreamEvent;
+            try {
+              event = JSON.parse(line.slice('data: '.length));
+            } catch {
+              // A partial frame; the remainder arrives with the next chunk.
+              continue;
+            }
+
+            if (event.error) throw new Error(event.error);
+            if (event.content) controller.enqueue(event.content);
+            if (event.done) {
+              controller.close();
+              return;
             }
           }
         }
         controller.close();
-        } catch (err: any) {
-          if (err?.name === 'AbortError') controller.close();
-          else controller.error(err);
-        } finally {
-          signal?.removeEventListener('abort', onAbort);
-        }
-      },
-    });
-  }
-
-  async uploadFile(file: File): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const result = await this.safeFetch(`${API_BASE}/upload`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: formData,
-    });
-    return result.data;
-  }
-
-  async getModels(provider: string = 'gemini', baseUrl?: string): Promise<any[]> {
-    const params = new URLSearchParams();
-    if (provider) params.set('provider', provider);
-    if (baseUrl) params.set('baseUrl', baseUrl);
-    const url = `${API_BASE}/models?${params.toString()}`;
-    const result = await this.safeFetch(url, { headers: this.getAuthHeaders(true) });
-    return result.data || [];
-  }
-
-  // Conversations
-  async getConversations(): Promise<any[]> {
-    const result = await this.safeFetch(`${API_BASE}/conversations`);
-    if (Array.isArray(result)) return result;
-    return result.data || [];
-  }
-
-  async getConversation(id: string): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/conversations/${id}`);
-    if (result && result.data) return result.data;
-    return result;
-  }
-
-  async createConversation(data: { title?: string; model?: string; agentMode?: string }): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/conversations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (result && result.data) return result.data;
-    return result;
-  }
-
-  async updateConversation(id: string, data: any): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/conversations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (result && result.data) return result.data;
-    return result;
-  }
-
-  async deleteConversation(id: string): Promise<void> {
-    await this.safeFetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE' });
-  }
-
-  // Files
-  async listFiles(dirPath?: string): Promise<any> {
-    const p = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
-    const result = await this.safeFetch(`${API_BASE}/files/list${p}`);
-    return result.data;
-  }
-  async readFile(filePath: string): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/files/read?path=${encodeURIComponent(filePath)}`);
-    return result.data;
-  }
-  async writeFile(filePath: string, content: string): Promise<any> {
-    const result = await this.safeFetch(`${API_BASE}/files/write`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: filePath, content, allowedPath: this.allowedPath }),
-    });
-    return result.data;
-  }
-
-  // Git
-  async gitStatus(repoPath?: string): Promise<any> {
-    const p = repoPath ? `?path=${encodeURIComponent(repoPath)}` : '';
-    const result = await this.safeFetch(`${API_BASE}/git/status${p}`);
-    return result.data;
-  }
-  async gitLog(repoPath?: string): Promise<any> {
-    const p = repoPath ? `?path=${encodeURIComponent(repoPath)}` : '';
-    const result = await this.safeFetch(`${API_BASE}/git/log${p}`);
-    return result.data;
-  }
+      } catch (error: any) {
+        if (error?.name === 'AbortError') controller.close();
+        else controller.error(error);
+      } finally {
+        signal?.removeEventListener('abort', onAbort);
+      }
+    },
+  });
 }
 
-export const api = new ApiService();
+export const apiClient = new ApiClient();

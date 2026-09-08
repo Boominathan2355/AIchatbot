@@ -1,3 +1,5 @@
+export type ProviderType = 'gemini' | 'chatgpt' | 'ollama' | 'llamacpp';
+
 export interface Attachment {
   id: string;
   fileName: string;
@@ -7,14 +9,6 @@ export interface Attachment {
   base64Data?: string;
   mimeType?: string;
   preview?: string;
-}
-
-export type ProviderType = 'gemini' | 'chatgpt' | 'ollama' | 'llamacpp';
-
-export interface ProviderConfig {
-  type: ProviderType;
-  apiKey?: string;
-  baseUrl?: string;
 }
 
 export interface Message {
@@ -69,7 +63,7 @@ export const AGENT_MODES: AgentModeConfig[] = [
 export interface ModelInfo {
   id: string;
   name: string;
-  description: string;
+  description?: string;
 }
 
 export interface Settings {
@@ -81,6 +75,22 @@ export interface Settings {
   allowedPath?: string;
   enableFileManager?: boolean;
   enableGit?: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+  token: string;
+}
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema?: { properties?: Record<string, unknown> };
 }
 
 export interface ApiError {

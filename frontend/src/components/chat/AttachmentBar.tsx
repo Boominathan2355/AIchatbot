@@ -1,4 +1,4 @@
-import { Attachment } from '../../types/chat';
+import { Attachment } from '../../types';
 import { CloseIcon } from '../ui/Icons';
 
 interface AttachmentBarProps {

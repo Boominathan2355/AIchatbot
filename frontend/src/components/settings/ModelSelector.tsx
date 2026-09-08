@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ModelInfo } from '../../types/chat';
+import { ModelInfo } from '../../types';
 import { ChevronDownIcon } from '../ui/Icons';
 
 interface ModelSelectorProps {

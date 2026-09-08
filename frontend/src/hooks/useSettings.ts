@@ -1,33 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Settings } from '../types/chat';
-import { getSettings, saveSettings } from '../services/storage';
-import { api } from '../services/api';
+import { Settings } from '../types';
+import { loadSettings, saveSettings } from '../services/settingsStorage';
+import { apiClient } from '../services/apiClient';
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings>(getSettings);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Keep the API client in step with the persisted provider key and allowed path.
   useEffect(() => {
-    api.setApiKey(settings.apiKey);
-    api.setAllowedPath(settings.allowedPath || '');
+    apiClient.setProviderApiKey(settings.apiKey);
+    apiClient.setAllowedPath(settings.allowedPath || '');
   }, [settings.apiKey, settings.allowedPath]);
 
-  const updateSettings = (updates: Partial<Settings>) => {
-    const newSettings = { ...settings, ...updates };
-    setSettings(newSettings);
-    saveSettings(newSettings);
-    if (updates.apiKey !== undefined) {
-      api.setApiKey(updates.apiKey);
-    }
-    if (updates.allowedPath !== undefined) {
-      api.setAllowedPath(updates.allowedPath);
-    }
+  const updateSettings = (changes: Partial<Settings>) => {
+    const nextSettings = { ...settings, ...changes };
+    setSettings(nextSettings);
+    saveSettings(nextSettings);
   };
 
-  return {
-    settings,
-    updateSettings,
-    showSettings,
-    setShowSettings,
-  };
+  return { settings, updateSettings, showSettings, setShowSettings };
 }

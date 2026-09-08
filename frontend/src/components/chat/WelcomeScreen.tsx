@@ -1,5 +1,5 @@
-import { AgentMode } from '../../types/chat';
-import { Icon } from '../ui/IconMap';
+import { AgentMode } from '../../types';
+import { Icon } from '../ui/Icon';
 
 interface WelcomeScreenProps {
   agentMode: AgentMode;

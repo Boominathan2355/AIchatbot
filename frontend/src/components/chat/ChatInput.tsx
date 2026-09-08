@@ -1,8 +1,8 @@
 import { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
-import { Attachment, AgentMode, AGENT_MODES } from '../../types/chat';
+import { Attachment, AgentMode, AGENT_MODES } from '../../types';
 import { TextArea } from '../ui/TextArea';
 import { AttachmentBar } from './AttachmentBar';
-import { Icon } from '../ui/IconMap';
+import { Icon } from '../ui/Icon';
 import { SendIcon, StopIcon, ChevronDownIcon } from '../ui/Icons';
 
 interface ChatInputProps {

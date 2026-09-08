@@ -1,15 +1,17 @@
-export function encode(text: string): string {
-  return btoa(decodeURIComponent(encodeURIComponent(text)));
+/**
+ * UTF-8 safe base64 helpers. This is an encoding, not encryption: the
+ * transport (TLS) is what protects values in flight.
+ */
+
+export function encodeBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
-export function decode(b64: string): string {
-  return decodeURIComponent(encodeURIComponent(atob(b64)));
-}
-
-export async function hashValue(text: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const cryptoBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(cryptoBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+export function decodeBase64(encoded: string): string {
+  const binary = atob(encoded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }

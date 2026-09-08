@@ -1,4 +1,4 @@
-import { Conversation } from '../../types/chat';
+import { Conversation } from '../../types';
 import { ConversationItem } from './ConversationItem';
 
 interface ConversationListProps {

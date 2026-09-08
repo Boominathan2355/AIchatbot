@@ -1,88 +1,72 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api } from '../services/api';
+import { apiClient } from '../services/apiClient';
+import { AuthUser } from '../types';
 
-interface User {
-  id: string;
-  username: string;
-}
+const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
 
-interface AuthContextType {
-  user: User | null;
+interface AuthContextValue {
+  user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+  isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('auth_token'));
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
   const [isLoading, setIsLoading] = useState(true);
 
+  const clearSession = () => {
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    apiClient.setAuthToken('');
+    setToken(null);
+    setUser(null);
+  };
+
+  const storeSession = ({ token: nextToken, user: nextUser }: { token: string; user: AuthUser }) => {
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, nextToken);
+    apiClient.setAuthToken(nextToken);
+    setToken(nextToken);
+    setUser(nextUser);
+  };
+
   useEffect(() => {
-    if (token) {
-      api.setAuthToken(token);
-      api.getProfile()
-        .then((data) => {
-          setUser(data.user);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          localStorage.removeItem('auth_token');
-          setToken(null);
-          api.setAuthToken('');
-          setIsLoading(false);
-        });
-    } else {
+    if (!token) {
       setIsLoading(false);
+      return;
     }
+
+    apiClient.setAuthToken(token);
+    apiClient
+      .getCurrentUser()
+      .then(setUser)
+      .catch(clearSession)
+      .finally(() => setIsLoading(false));
   }, [token]);
 
   const login = async (username: string, password: string) => {
-    const result = await api.login(username, password);
-    localStorage.setItem('auth_token', result.token);
-    setToken(result.token);
-    api.setAuthToken(result.token);
-    setUser(result.user);
+    storeSession(await apiClient.login(username, password));
   };
 
   const register = async (username: string, password: string) => {
-    const result = await api.register(username, password);
-    localStorage.setItem('auth_token', result.token);
-    setToken(result.token);
-    api.setAuthToken(result.token);
-    setUser(result.user);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('auth_token');
-    setToken(null);
-    api.setAuthToken('');
-    setUser(null);
+    storeSession(await apiClient.register(username, password));
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isLoading,
-        login,
-        register,
-        logout,
-        isAuthenticated: !!user,
-      }}
+      value={{ user, token, isLoading, isAuthenticated: Boolean(user), login, register, logout: clearSession }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');

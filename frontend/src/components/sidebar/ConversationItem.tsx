@@ -1,4 +1,4 @@
-import { Conversation } from '../../types/chat';
+import { Conversation } from '../../types';
 import { TrashIcon } from '../ui/Icons';
 
 interface ConversationItemProps {

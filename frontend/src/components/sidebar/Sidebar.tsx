@@ -1,4 +1,4 @@
-import { Conversation } from '../../types/chat';
+import { Conversation } from '../../types';
 import { ConversationList } from './ConversationList';
 import { PlusIcon, SettingsIcon, CloseIcon, BotIcon } from '../ui/Icons';
 

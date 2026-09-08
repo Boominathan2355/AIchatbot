@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Message } from '../../types/chat';
+import { Message } from '../../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ThinkingBlock, parseThinking } from './ThinkingBlock';
 import { BotIcon, UserIcon, CopyIcon, CheckIcon } from '../ui/Icons';

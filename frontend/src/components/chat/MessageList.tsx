@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { Message } from '../../types/chat';
+import { Message, AgentMode } from '../../types';
 import { MessageBubble } from './MessageBubble';
 import { WelcomeScreen } from './WelcomeScreen';
-import { AgentMode } from '../../types/chat';
 import { BotIcon } from '../ui/Icons';
 
-interface ChatAreaProps {
+interface MessageListProps {
   messages: Message[];
   isStreaming: boolean;
   streamingContent: string;
@@ -13,18 +12,37 @@ interface ChatAreaProps {
   onRetry?: (content: string) => void;
 }
 
-export function ChatArea({ messages, isStreaming, streamingContent, agentMode, onRetry }: ChatAreaProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start animate-fade-in">
+      <div className="flex gap-3">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
+          <BotIcon className="w-4 h-4" />
+        </div>
+        <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
+          <div className="flex gap-1.5 items-center">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MessageList({ messages, isStreaming, streamingContent, agentMode, onRetry }: MessageListProps) {
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
   if (messages.length === 0 && !isStreaming) {
     return <WelcomeScreen agentMode={agentMode} />;
   }
 
-  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -33,13 +51,14 @@ export function ChatArea({ messages, isStreaming, streamingContent, agentMode, o
           const isLast = index === messages.length - 1;
           const retryContent = message.role === 'user' ? message.content : lastUserMessage?.content;
           return (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            isLast={isLast}
-            onRetry={onRetry && retryContent ? () => onRetry(retryContent) : undefined}
-          />
-        )})}
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isLast={isLast}
+              onRetry={onRetry && retryContent ? () => onRetry(retryContent) : undefined}
+            />
+          );
+        })}
 
         {isStreaming && streamingContent && (
           <div className="animate-fade-in">
@@ -61,24 +80,9 @@ export function ChatArea({ messages, isStreaming, streamingContent, agentMode, o
           </div>
         )}
 
-        {isStreaming && !streamingContent && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="flex gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
-                <BotIcon className="w-4 h-4" />
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
-                <div className="flex gap-1.5 items-center">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {isStreaming && !streamingContent && <TypingIndicator />}
 
-        <div ref={messagesEndRef} />
+        <div ref={endOfMessagesRef} />
       </div>
     </div>
   );

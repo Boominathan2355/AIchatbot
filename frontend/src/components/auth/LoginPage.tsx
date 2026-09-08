@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { encode } from '../../utils/crypto';
+import { encodeBase64 } from '../../utils/base64';
 
 interface LoginPageProps {
   onToggleMode: () => void;
@@ -20,8 +20,8 @@ export function LoginPage({ onToggleMode, isRegister }: LoginPageProps) {
     setLoading(true);
 
     try {
-      const encUsername = encode(username.trim());
-      const encPassword = encode(password);
+      const encUsername = encodeBase64(username.trim());
+      const encPassword = encodeBase64(password);
 
       if (isRegister) {
         await register(encUsername, encPassword);

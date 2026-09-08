@@ -29,7 +29,10 @@ import {
   ImageIcon,
 } from './Icons';
 
-const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
+type IconComponent = React.FC<React.SVGProps<SVGSVGElement>>;
+
+/** Icons addressable by name, e.g. from AGENT_MODES[].icon. */
+const ICONS_BY_NAME: Record<string, IconComponent> = {
   chat: ChatBubbleIcon,
   code: CodeIcon,
   developer: BrainIcon,
@@ -68,40 +71,6 @@ interface IconProps {
 }
 
 export function Icon({ name, className = 'w-5 h-5' }: IconProps) {
-  const IconComponent = iconMap[name];
-  if (!IconComponent) {
-    return <ChatBubbleIcon className={className} />;
-  }
-  return <IconComponent className={className} />;
+  const Component = ICONS_BY_NAME[name] ?? ChatBubbleIcon;
+  return <Component className={className} />;
 }
-
-export {
-  ChatBubbleIcon,
-  CodeIcon,
-  BugIcon,
-  ArchitectureIcon,
-  WriteIcon,
-  LightbulbIcon,
-  SearchIcon,
-  BriefcaseIcon,
-  BrainIcon,
-  BotIcon,
-  UserIcon,
-  SendIcon,
-  StopIcon,
-  PlusIcon,
-  ChatIcon,
-  TrashIcon,
-  SettingsIcon,
-  SunIcon,
-  MoonIcon,
-  CloseIcon,
-  MenuIcon,
-  ChevronDownIcon,
-  EyeIcon,
-  EyeOffIcon,
-  CopyIcon,
-  CheckIcon,
-  DocumentIcon,
-  ImageIcon,
-};
