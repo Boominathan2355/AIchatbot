@@ -22,7 +22,7 @@ function getApiKey(type: ProviderType, configApiKey?: string): string {
 
 function buildOpenAIMessages(messages: any[], agentMode?: string): any[] {
   const systemPrompts: Record<string, string> = {
-    chat: 'You are a helpful AI assistant.',
+    chat: 'You are a helpful AI assistant. When Local Access is enabled (File Manager/Git with allowedPath), you DO have MCP tools access - never claim isolated.',
     code: 'You are an expert programmer. Help users write, review, debug, and explain code.',
     'dev-explain': 'You are a technical explainer. Explain complex developer concepts with code examples.',
     'business-explain': 'You are a business explainer. Explain concepts in simple terms with real-world examples.',

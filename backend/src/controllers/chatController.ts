@@ -43,7 +43,32 @@ export async function handleChat(req: AuthRequest, res: Response) {
       try { webContext = await collectWebContext(message); } catch (e) { console.error('web collect failed', e); }
     }
 
-    const enrichedMessage = webContext ? `${message}\n\n[Realtime Web Context (free APIs) - cite sources]:\n${webContext}` : message;
+    // Tool context: if user says "use tool" and Local Access enabled, actually call file_list
+    let toolContext: string | null = null;
+    const allowedBaseHeader = (req.headers['x-allowed-path'] as string) || (req.body as any).allowedPath;
+    const lower = message.toLowerCase();
+    const wantsTool = lower.includes('use tool') || lower.includes('get it') || lower.includes('list file') || lower.includes('show file') || lower.includes('tool');
+    if (wantsTool && allowedBaseHeader) {
+      try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const target = path.resolve(allowedBaseHeader);
+        const entries = await fs.readdir(target, { withFileTypes: true }).catch(() => []);
+        if (entries.length > 0) {
+          const list = entries.slice(0, 30).map(e => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`).join('\n');
+          toolContext = `[MCP Tool file_list executed on ${target} - you DO have tool access]:\n${list}\n[Do NOT claim you are isolated. Use this file list to answer.]`;
+        } else {
+          toolContext = `[MCP Tool file_list on ${target}: empty or not found. You DO have tool access.]`;
+        }
+      } catch (e: any) { toolContext = `[Tool error: ${e.message}]`; }
+    } else if (wantsTool && !allowedBaseHeader) {
+      toolContext = `[User asked to use tool but allowedPath not set. Tell them to set Allowed Path in Settings → Local Access and enable File Manager.]`;
+    }
+
+    const parts = [message];
+    if (webContext) parts.push(`[Realtime Web Context (free APIs) - cite sources]:\n${webContext}`);
+    if (toolContext) parts.push(toolContext);
+    const enrichedMessage = parts.join('\n\n');
 
     const chatMessages: any[] = [
       ...history,
@@ -143,7 +168,28 @@ export async function handleChatNonStream(req: AuthRequest, res: Response) {
   }
   let webContextNs: string | null = null;
   if (agentMode === 'web') { try { webContextNs = await collectWebContext(message); } catch {} }
-  const enrichedNs = webContextNs ? `${message}\n\n[Realtime Web Context (free APIs)]:\n${webContextNs}` : message;
+  let toolContextNs: string | null = null;
+  const allowedBaseNs = (req.headers['x-allowed-path'] as string) || (req.body as any).allowedPath;
+  const lowerNs = message.toLowerCase();
+  const wantsToolNs = lowerNs.includes('use tool') || lowerNs.includes('get it') || lowerNs.includes('list file') || lowerNs.includes('show file') || lowerNs.includes('tool');
+  if (wantsToolNs && allowedBaseNs) {
+    try {
+      const fsNs = await import('fs/promises');
+      const pathNs = await import('path');
+      const targetNs = pathNs.resolve(allowedBaseNs);
+      const entriesNs = await fsNs.readdir(targetNs, { withFileTypes: true }).catch(() => []);
+      if (entriesNs.length > 0) {
+        const listNs = entriesNs.slice(0, 30).map(e => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`).join('\n');
+        toolContextNs = `[MCP Tool file_list executed on ${targetNs}]:\n${listNs}`;
+      } else toolContextNs = `[MCP Tool file_list on ${targetNs}: empty]`;
+    } catch (e: any) { toolContextNs = `[Tool error: ${e.message}]`; }
+  } else if (wantsToolNs && !allowedBaseNs) {
+    toolContextNs = `[User asked to use tool but allowedPath not set. Tell them to set Allowed Path in Settings.]`;
+  }
+  const partsNs = [message];
+  if (webContextNs) partsNs.push(`[Realtime Web Context]:\n${webContextNs}`);
+  if (toolContextNs) partsNs.push(toolContextNs);
+  const enrichedNs = partsNs.join('\n\n');
   const chatMessagesNs: any[] = [...historyNs, { role: 'user' as const, content: enrichedNs, attachments: attachments as Attachment[] | undefined, agentMode }];
   (chatMessagesNs as any).agentMode = agentMode;
 

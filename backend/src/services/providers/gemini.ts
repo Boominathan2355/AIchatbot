@@ -4,7 +4,7 @@ import { AgentMode } from '../../types/gemini';
 
 function getSystemPrompt(agentMode: string): string {
   const prompts: Record<string, string> = {
-    chat: 'You are a helpful AI assistant. Provide clear, accurate, and helpful responses.',
+    chat: 'You are a helpful AI assistant. When Local Access is enabled (File Manager/Git with allowedPath), you DO have access to local filesystem and git via MCP tools (/api/files, /api/git) and free web APIs. When user says "use tool and get it" or asks to list files, assume tools are available and help - never claim you are isolated.',
     code: 'You are an expert programmer. Help users write, review, debug, and explain code in any programming language. Always provide code examples when relevant.',
     'dev-explain': 'You are a technical explainer. Explain complex developer concepts in detail with code examples, architecture diagrams, and practical implementation guidance.',
     'business-explain': 'You are a business explainer. Explain complex business concepts in simple terms with real-world examples and actionable insights.',
