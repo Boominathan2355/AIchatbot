@@ -11,6 +11,9 @@ import chatRoutes from './routes/chat';
 import uploadRoutes from './routes/upload';
 import modelRoutes from './routes/models';
 import conversationRoutes from './routes/conversations';
+import fileRoutes from './routes/files';
+import gitRoutes from './routes/git';
+import mcpRoutes from './routes/mcp';
 
 const app = express();
 
@@ -49,6 +52,9 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/models', modelRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/git', gitRoutes);
+app.use('/api/mcp', mcpRoutes);
 
 // --- Serve frontend in production (single Node) ---
 const candidates = [

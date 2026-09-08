@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Message } from '../../types/chat';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { ThinkingBlock, parseThinking } from './ThinkingBlock';
 import { BotIcon, UserIcon, CopyIcon, CheckIcon } from '../ui/Icons';
 
 interface MessageBubbleProps {
@@ -42,11 +43,16 @@ export function MessageBubble({ message, isLast, onRetry }: MessageBubbleProps) 
               ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
               : 'bg-transparent text-gray-900 dark:text-white'
           }`}>
-            {isUser ? (
-              <p className="text-[0.875rem] leading-relaxed whitespace-pre-wrap">{message.content}</p>
-            ) : (
-              <MarkdownRenderer content={message.content} />
-            )}
+            {(() => {
+              if (isUser) return <p className="text-[0.875rem] leading-relaxed whitespace-pre-wrap">{message.content}</p>;
+              const { thinking, answer } = parseThinking(message.content);
+              return (
+                <>
+                  {thinking && <ThinkingBlock thinking={thinking} />}
+                  <MarkdownRenderer content={answer} />
+                </>
+              );
+            })()}
 
             {message.attachments && message.attachments.length > 0 && (
               <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">

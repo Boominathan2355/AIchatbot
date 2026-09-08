@@ -3,6 +3,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 class ApiService {
   private apiKey: string = '';
   private authToken: string = '';
+  private allowedPath: string = '';
 
   setApiKey(key: string) {
     this.apiKey = key;
@@ -12,10 +13,17 @@ class ApiService {
     this.authToken = token;
   }
 
+  setAllowedPath(p: string) {
+    this.allowedPath = p;
+  }
+
   private getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
     if (this.authToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`;
+    }
+    if (this.allowedPath) {
+      headers['X-Allowed-Path'] = this.allowedPath;
     }
     return headers;
   }
@@ -194,6 +202,37 @@ class ApiService {
 
   async deleteConversation(id: string): Promise<void> {
     await this.safeFetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE' });
+  }
+
+  // Files
+  async listFiles(dirPath?: string): Promise<any> {
+    const p = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
+    const result = await this.safeFetch(`${API_BASE}/files/list${p}`);
+    return result.data;
+  }
+  async readFile(filePath: string): Promise<any> {
+    const result = await this.safeFetch(`${API_BASE}/files/read?path=${encodeURIComponent(filePath)}`);
+    return result.data;
+  }
+  async writeFile(filePath: string, content: string): Promise<any> {
+    const result = await this.safeFetch(`${API_BASE}/files/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath, content, allowedPath: this.allowedPath }),
+    });
+    return result.data;
+  }
+
+  // Git
+  async gitStatus(repoPath?: string): Promise<any> {
+    const p = repoPath ? `?path=${encodeURIComponent(repoPath)}` : '';
+    const result = await this.safeFetch(`${API_BASE}/git/status${p}`);
+    return result.data;
+  }
+  async gitLog(repoPath?: string): Promise<any> {
+    const p = repoPath ? `?path=${encodeURIComponent(repoPath)}` : '';
+    const result = await this.safeFetch(`${API_BASE}/git/log${p}`);
+    return result.data;
   }
 }
 

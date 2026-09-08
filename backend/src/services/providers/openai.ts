@@ -31,6 +31,8 @@ function buildOpenAIMessages(messages: any[], agentMode?: string): any[] {
     architect: 'You are a system architect. Design scalable systems.',
     write: 'You are a technical writer. Help write documentation and specs.',
     brainstorm: 'You are a creative brainstorming assistant.',
+    'file-manager': 'You are a file manager assistant. Help browse and manage files.',
+    'git': 'You are a Git expert. Help with git operations.',
   };
 
   const openaiMessages: any[] = [];

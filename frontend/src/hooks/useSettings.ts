@@ -9,7 +9,12 @@ export function useSettings() {
 
   useEffect(() => {
     api.setApiKey(settings.apiKey);
-  }, [settings.apiKey]);
+    api.setAllowedPath(settings.allowedPath || '');
+  }, [settings.apiKey, settings.allowedPath]);
+
+  useEffect(() => {
+    api.setAllowedPath(settings.allowedPath || '');
+  }, [settings.allowedPath]);
 
   const updateSettings = (updates: Partial<Settings>) => {
     const newSettings = { ...settings, ...updates };
@@ -17,6 +22,9 @@ export function useSettings() {
     saveSettings(newSettings);
     if (updates.apiKey !== undefined) {
       api.setApiKey(updates.apiKey);
+    }
+    if (updates.allowedPath !== undefined) {
+      api.setAllowedPath(updates.allowedPath);
     }
   };
 

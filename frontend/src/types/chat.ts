@@ -45,7 +45,9 @@ export type AgentMode =
   | 'debug'
   | 'architect'
   | 'write'
-  | 'brainstorm';
+  | 'brainstorm'
+  | 'file-manager'
+  | 'git';
 
 export interface AgentModeConfig {
   mode: AgentMode;
@@ -64,6 +66,8 @@ export const AGENT_MODES: AgentModeConfig[] = [
   { mode: 'architect', label: 'System Architect', description: 'System design and architecture', icon: 'architecture' },
   { mode: 'write', label: 'Technical Writer', description: 'Documentation, READMEs, specs', icon: 'write' },
   { mode: 'brainstorm', label: 'Brainstorm', description: 'Generate ideas and creative solutions', icon: 'lightbulb' },
+  { mode: 'file-manager', label: 'File Manager', description: 'Browse, read, write local files', icon: 'file' },
+  { mode: 'git', label: 'Git Assistant', description: 'Git operations, commit, status', icon: 'git' },
 ];
 
 export interface ModelInfo {
@@ -78,6 +82,9 @@ export interface Settings {
   baseUrl?: string;
   model: string;
   theme: 'light' | 'dark' | 'system';
+  allowedPath?: string;
+  enableFileManager?: boolean;
+  enableGit?: boolean;
 }
 
 export interface ApiError {

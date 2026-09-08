@@ -48,7 +48,9 @@ export type AgentMode =
   | 'debug'
   | 'architect'
   | 'write'
-  | 'brainstorm';
+  | 'brainstorm'
+  | 'file-manager'
+  | 'git';
 
 export interface AgentModeConfig {
   mode: AgentMode;
@@ -218,5 +220,30 @@ Format your response as:
 - Detailed Exploration of Each Idea
 - Implementation Considerations
 - Next Steps`,
+  },
+  {
+    mode: 'file-manager',
+    label: 'File Manager',
+    description: 'Browse, read, write local files',
+    icon: 'file',
+    systemPrompt: `You are a file manager assistant. You can help users browse, read, create, and organize files within their allowed path. When file-manager is enabled:
+1. Use the allowed path from settings to list/read/write files
+2. Provide clear file listings with sizes and types
+3. Help create, edit, and organize content
+4. Warn before destructive operations
+5. Suggest file organization best practices
+6. When user asks to open/read a file, explain you will read it via the File API`,
+  },
+  {
+    mode: 'git',
+    label: 'Git Assistant',
+    description: 'Git operations, commit, status',
+    icon: 'git',
+    systemPrompt: `You are a Git expert. When git is enabled:
+1. Help with git status, add, commit, log, init, branch operations
+2. Explain git concepts clearly
+3. Suggest commit messages and workflows
+4. Warn before destructive git operations
+5. Operate strictly within the allowed path repository`,
   },
 ];

@@ -96,6 +96,26 @@ const WELCOME_MESSAGES: Record<AgentMode, { title: string; subtitle: string; sug
       'Ways to improve code review process',
     ],
   },
+  'file-manager': {
+    title: 'File Manager',
+    subtitle: 'Browse and manage local files within your allowed path.',
+    suggestions: [
+      'List files in my allowed path',
+      'Read the README.md file',
+      'Create a new file notes.txt',
+      'Show me the largest files in this folder',
+    ],
+  },
+  git: {
+    title: 'Git Assistant',
+    subtitle: 'Manage git repositories – status, commit, log, branch.',
+    suggestions: [
+      'Show git status',
+      'What has changed in the last commit?',
+      'Create a commit with message "update docs"',
+      'Show git log',
+    ],
+  },
 };
 
 export function WelcomeScreen({ agentMode }: WelcomeScreenProps) {

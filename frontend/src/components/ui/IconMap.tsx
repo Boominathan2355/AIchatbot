@@ -58,6 +58,8 @@ const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   check: CheckIcon,
   document: DocumentIcon,
   image: ImageIcon,
+  file: DocumentIcon,
+  git: CodeIcon,
 };
 
 interface IconProps {

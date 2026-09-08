@@ -21,17 +21,36 @@ export async function handleChat(req: AuthRequest, res: Response) {
   let fullResponse = '';
 
   try {
-    const chatMessages = [{
-      role: 'user' as const,
-      content: message,
-      attachments: attachments as Attachment[] | undefined,
-      agentMode,
-    }];
+    // --- Conversation memory: load previous messages ---
+    let history: any[] = [];
+    if (conversationId && req.userId) {
+      try {
+        const conv = await Conversation.findOne({ _id: conversationId, userId: req.userId }).lean();
+        if (conv?.messages) {
+          history = conv.messages.map((m: any) => ({
+            role: m.role,
+            content: m.content,
+            attachments: m.attachments,
+          }));
+        }
+      } catch (e) { console.error('Failed to load history:', e); }
+    }
+
+    const chatMessages: any[] = [
+      ...history,
+      {
+        role: 'user' as const,
+        content: message,
+        attachments: attachments as Attachment[] | undefined,
+        agentMode,
+      },
+    ];
+    (chatMessages as any).agentMode = agentMode;
 
     const providerType = provider as ProviderType;
 
     const stream = streamChatWithProvider({
-      messages: chatMessages,
+      messages: chatMessages as any,
       model: model || getDefaultModel(providerType),
       config: {
         type: providerType,
@@ -93,7 +112,7 @@ function getDefaultModel(providerType: ProviderType): string {
     case 'ollama': return 'llama3';
     case 'llamacpp': return 'default';
     case 'gemini':
-    default: return 'gemini-2.5-flash';
+    default: return 'gemini-3.8-flash';
   }
 }
 
@@ -106,16 +125,19 @@ export async function handleChatNonStream(req: AuthRequest, res: Response) {
 
   const { chatWithProvider } = await import('../services/providers');
 
-  const chatMessages = [{
-    role: 'user' as const,
-    content: message,
-    attachments: attachments as Attachment[] | undefined,
-    agentMode,
-  }];
+  let historyNs: any[] = [];
+  if ((req as any).body?.conversationId && (req as AuthRequest).userId) {
+    try {
+      const convNs = await Conversation.findOne({ _id: (req as any).body.conversationId, userId: (req as AuthRequest).userId }).lean();
+      if (convNs?.messages) historyNs = convNs.messages.map((m: any) => ({ role: m.role, content: m.content, attachments: m.attachments }));
+    } catch {}
+  }
+  const chatMessagesNs: any[] = [...historyNs, { role: 'user' as const, content: message, attachments: attachments as Attachment[] | undefined, agentMode }];
+  (chatMessagesNs as any).agentMode = agentMode;
 
   const providerType = provider as ProviderType;
   const response = await chatWithProvider({
-    messages: chatMessages,
+    messages: chatMessagesNs as any,
     model: model || getDefaultModel(providerType),
     config: {
       type: providerType,

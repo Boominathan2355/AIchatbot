@@ -13,6 +13,8 @@ function getSystemPrompt(agentMode: string): string {
     architect: 'You are a system architect. Design scalable, maintainable systems. Provide architecture diagrams, technology recommendations, and best practices.',
     write: 'You are a technical writer. Help write documentation, READMEs, API docs, and technical specifications. Use clear, professional language.',
     brainstorm: 'You are a creative brainstorming assistant. Generate innovative ideas, explore different perspectives, and help users think outside the box.',
+    'file-manager': 'You are a file manager assistant. Help browse, read, write and organize files within the allowed path.',
+    'git': 'You are a Git expert. Help with git status, add, commit, log operations within the allowed path.',
   };
   return prompts[agentMode] || prompts.chat;
 }
@@ -91,21 +93,14 @@ export class GeminiProvider implements Provider {
   }
 
   async listModels(config: ProviderConfig): Promise<{ id: string; name: string }[]> {
+    const base = [
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
+      { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
+      { id: 'gemini-nano', name: 'Gemini Nano' },
+    ];
     const apiKey = config.apiKey || process.env.GEMINI_API_KEY;
-    if (!apiKey) return [
-      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
-      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-      { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    ];
-
-    return [
-      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
-      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-      { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    ];
+    if (!apiKey) return base;
+    return base;
   }
 }

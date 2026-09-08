@@ -19,12 +19,13 @@ export function getGemini(): GoogleGenerativeAI {
   return genAI;
 }
 
-export const DEFAULT_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_MODEL = 'gemini-3.8-flash';
 
 export function getDefaultModels() {
   return [
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fastest, best for most tasks' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Advanced reasoning and analysis' },
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Legacy model, may be unavailable' },
+    { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', description: 'Flagship, best quality' },
+    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', description: 'Balanced speed/quality' },
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', description: 'Fast' },
+    { id: 'gemini-nano', name: 'Gemini Nano', description: 'Ultra-fast on-device nano model' },
   ];
 }

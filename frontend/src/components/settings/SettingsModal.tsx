@@ -19,6 +19,9 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   const [provider, setProvider] = useState<ProviderType>(settings.provider);
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl || '');
+  const [allowedPath, setAllowedPath] = useState(settings.allowedPath || '');
+  const [enableFileManager, setEnableFileManager] = useState(!!settings.enableFileManager);
+  const [enableGit, setEnableGit] = useState(!!settings.enableGit);
   const [showApiKey, setShowApiKey] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -27,11 +30,14 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
       setProvider(settings.provider);
       setApiKey(settings.apiKey);
       setBaseUrl(settings.baseUrl || '');
+      setAllowedPath(settings.allowedPath || '');
+      setEnableFileManager(!!settings.enableFileManager);
+      setEnableGit(!!settings.enableGit);
     }
   }, [isOpen, settings]);
 
   const handleSave = () => {
-    onUpdateSettings({ provider, apiKey, baseUrl });
+    onUpdateSettings({ provider, apiKey, baseUrl, allowedPath, enableFileManager, enableGit });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -106,6 +112,29 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
             selectedModel={settings.model}
             onSelect={(model) => onUpdateSettings({ model })}
           />
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Local Access (Agent Tools)</h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Allow agent to access local files/git on desktop/mobile. Set an absolute path (e.g., /home/user/projects or C:\Users\You\Desktop). Works when running locally; on Render it accesses server's filesystem.</p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Allowed Path</label>
+            <input
+              type="text"
+              value={allowedPath}
+              onChange={(e) => setAllowedPath(e.target.value)}
+              placeholder="/tmp or ./  or C:\Users\...\Desktop"
+              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white"
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={enableFileManager} onChange={(e) => setEnableFileManager(e.target.checked)} className="rounded" />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Enable File Manager</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={enableGit} onChange={(e) => setEnableGit(e.target.checked)} className="rounded" />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Enable Git</span>
+          </label>
         </div>
 
         <Button onClick={handleSave} className="w-full">
