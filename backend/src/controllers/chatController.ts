@@ -47,22 +47,27 @@ export async function handleChat(req: AuthRequest, res: Response) {
     let toolContext: string | null = null;
     const allowedBaseHeader = (req.headers['x-allowed-path'] as string) || (req.body as any).allowedPath;
     const lower = message.toLowerCase();
-    const wantsTool = lower.includes('use tool') || lower.includes('get it') || lower.includes('list file') || lower.includes('show file') || lower.includes('tool');
+    const wantsTool = lower.includes('use tool') || lower.includes('get it') || lower.includes('list file') || lower.includes('show file') || lower.includes('tool') || lower.includes('use mcp') || lower.includes('mcp');
     if (wantsTool && allowedBaseHeader) {
       try {
-        const fs = await import('fs/promises');
-        const path = await import('path');
-        const target = path.resolve(allowedBaseHeader);
-        const entries = await fs.readdir(target, { withFileTypes: true }).catch(() => []);
-        if (entries.length > 0) {
-          const list = entries.slice(0, 30).map(e => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`).join('\n');
-          toolContext = `[MCP Tool file_list executed on ${target} - you DO have tool access]:\n${list}\n[Do NOT claim you are isolated. Use this file list to answer.]`;
+        const isWindowsPath = /^[A-Z]:\\/i.test(allowedBaseHeader) || allowedBaseHeader.includes(':\\');
+        if (isWindowsPath) {
+          toolContext = `[MCP Tool note: User's allowedPath "${allowedBaseHeader}" is a Windows path on their local machine (C: drive). This cloud server runs Linux and cannot directly access the user's C: drive due to security isolation. You DO have tool access for server paths, but for user's Desktop, instruct them to either: 1) Run locally (npm run dev) with allowedPath set to their Desktop, or 2) Use the browser File Picker in the UI, or 3) Copy file list via PowerShell: Get-ChildItem "C:\\Users\\BN\\Desktop" | Select-Object Name. Do NOT output [object Object] - output a helpful explanation and the PowerShell command in a powershell code block. Never claim isolated without offering this path.]`;
         } else {
-          toolContext = `[MCP Tool file_list on ${target}: empty or not found. You DO have tool access.]`;
+          const fs = await import('fs/promises');
+          const path = await import('path');
+          const target = path.resolve(allowedBaseHeader);
+          const entries = await fs.readdir(target, { withFileTypes: true }).catch(() => []);
+          if (entries.length > 0) {
+            const list = entries.slice(0, 30).map(e => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`).join('\n');
+            toolContext = `[MCP Tool file_list executed on ${target} - you DO have tool access. Files:\n${list}\n---\nIMPORTANT: Output this list as a markdown bullet list with exact file names, NOT as JSON with [object Object]. Do NOT output [object Object]. Use the list above verbatim.]`;
+          } else {
+            toolContext = `[MCP Tool file_list on ${target}: empty or not found. You DO have tool access. Tell user the directory is empty or path not found on server.]`;
+          }
         }
       } catch (e: any) { toolContext = `[Tool error: ${e.message}]`; }
     } else if (wantsTool && !allowedBaseHeader) {
-      toolContext = `[User asked to use tool but allowedPath not set. Tell them to set Allowed Path in Settings → Local Access and enable File Manager.]`;
+      toolContext = `[User asked to use tool but allowedPath not set. Tell them to set Allowed Path in Settings → Local Access and enable File Manager. Example: /tmp or C:\\Users\\You\\Desktop (for local dev only).]`;
     }
 
     const parts = [message];
@@ -171,17 +176,22 @@ export async function handleChatNonStream(req: AuthRequest, res: Response) {
   let toolContextNs: string | null = null;
   const allowedBaseNs = (req.headers['x-allowed-path'] as string) || (req.body as any).allowedPath;
   const lowerNs = message.toLowerCase();
-  const wantsToolNs = lowerNs.includes('use tool') || lowerNs.includes('get it') || lowerNs.includes('list file') || lowerNs.includes('show file') || lowerNs.includes('tool');
+  const wantsToolNs = lowerNs.includes('use tool') || lowerNs.includes('get it') || lowerNs.includes('list file') || lowerNs.includes('show file') || lowerNs.includes('tool') || lowerNs.includes('use mcp') || lowerNs.includes('mcp');
   if (wantsToolNs && allowedBaseNs) {
     try {
-      const fsNs = await import('fs/promises');
-      const pathNs = await import('path');
-      const targetNs = pathNs.resolve(allowedBaseNs);
-      const entriesNs = await fsNs.readdir(targetNs, { withFileTypes: true }).catch(() => []);
-      if (entriesNs.length > 0) {
-        const listNs = entriesNs.slice(0, 30).map(e => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`).join('\n');
-        toolContextNs = `[MCP Tool file_list executed on ${targetNs}]:\n${listNs}`;
-      } else toolContextNs = `[MCP Tool file_list on ${targetNs}: empty]`;
+      const isWinNs = /^[A-Z]:\\/i.test(allowedBaseNs) || allowedBaseNs.includes(':\\');
+      if (isWinNs) {
+        toolContextNs = `[MCP Tool note: Windows path "${allowedBaseNs}" is on user's local machine, not accessible from Linux cloud server. Instruct to run locally or use File Picker. Do NOT output [object Object].]`;
+      } else {
+        const fsNs = await import('fs/promises');
+        const pathNs = await import('path');
+        const targetNs = pathNs.resolve(allowedBaseNs);
+        const entriesNs = await fsNs.readdir(targetNs, { withFileTypes: true }).catch(() => []);
+        if (entriesNs.length > 0) {
+          const listNs = entriesNs.slice(0, 30).map(e => `${e.isDirectory() ? '[DIR]' : '[FILE]'} ${e.name}`).join('\n');
+          toolContextNs = `[MCP Tool file_list executed on ${targetNs}]:\n${listNs}\n[IMPORTANT: Output as markdown bullet list, NOT as JSON with [object Object].]`;
+        } else toolContextNs = `[MCP Tool file_list on ${targetNs}: empty]`;
+      }
     } catch (e: any) { toolContextNs = `[Tool error: ${e.message}]`; }
   } else if (wantsToolNs && !allowedBaseNs) {
     toolContextNs = `[User asked to use tool but allowedPath not set. Tell them to set Allowed Path in Settings.]`;
