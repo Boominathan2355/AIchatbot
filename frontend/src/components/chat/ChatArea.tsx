@@ -24,20 +24,22 @@ export function ChatArea({ messages, isStreaming, streamingContent, agentMode, o
     return <WelcomeScreen agentMode={agentMode} />;
   }
 
-  const lastUserMessageIndex = [...messages].reverse().findIndex(m => m.role === 'user');
-  const lastUserMessageGlobalIndex = lastUserMessageIndex >= 0 ? messages.length - 1 - lastUserMessageIndex : -1;
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        {messages.map((message, index) => (
+        {messages.map((message, index) => {
+          const isLast = index === messages.length - 1;
+          const retryContent = message.role === 'user' ? message.content : lastUserMessage?.content;
+          return (
           <MessageBubble
             key={message.id}
             message={message}
-            isLast={index === lastUserMessageGlobalIndex}
-            onRetry={onRetry ? () => onRetry(message.content) : undefined}
+            isLast={isLast}
+            onRetry={onRetry && retryContent ? () => onRetry(retryContent) : undefined}
           />
-        ))}
+        )})}
 
         {isStreaming && streamingContent && (
           <MessageBubble
