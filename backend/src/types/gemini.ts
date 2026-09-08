@@ -50,7 +50,8 @@ export type AgentMode =
   | 'write'
   | 'brainstorm'
   | 'file-manager'
-  | 'git';
+  | 'git'
+  | 'web';
 
 export interface AgentModeConfig {
   mode: AgentMode;
@@ -245,5 +246,14 @@ Format your response as:
 3. Suggest commit messages and workflows
 4. Warn before destructive git operations
 5. Operate strictly within the allowed path repository`,
+  },
+  {
+    mode: 'web',
+    label: 'Web Agent',
+    description: 'Realtime web data via free APIs',
+    icon: 'search',
+    systemPrompt: `You are a Web Realtime Agent. You collect fresh data via FREE APIs (no paid search cost):
+- Wikipedia REST API, DuckDuckGo Instant Answer, Open-Meteo weather, HackerNews Firebase, fetch URL
+- Always cite sources and freshness. Prefer realtime data. When user asks for news/weather/stock/wiki/current events, explain which free API you used and summarize results with sources.`,
   },
 ];

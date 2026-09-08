@@ -14,4 +14,8 @@ export const MCP_TOOLS: McpTool[] = [
   { name: 'git_log', description: 'Git log', inputSchema: { type: 'object', properties: { path: { type: 'string' } } } },
   { name: 'git_add', description: 'Git add', inputSchema: { type: 'object', properties: { path: { type: 'string' }, files: { type: 'string' } } } },
   { name: 'git_commit', description: 'Git commit', inputSchema: { type: 'object', properties: { path: { type: 'string' }, message: { type: 'string' } }, required: ['message'] } },
+  { name: 'web_fetch', description: 'Fetch URL (free)', inputSchema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] } },
+  { name: 'wiki_search', description: 'Wikipedia summary (free)', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+  { name: 'weather', description: 'Weather via Open-Meteo (free)', inputSchema: { type: 'object', properties: { lat: { type: 'number' }, lon: { type: 'number' } }, required: ['lat','lon'] } },
+  { name: 'news', description: 'HackerNews top (free)', inputSchema: { type: 'object', properties: {} } },
 ];

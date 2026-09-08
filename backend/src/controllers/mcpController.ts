@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { MCP_TOOLS } from '../mcp/tools';
+import { fetchUrl, wikiSummary, openMeteoWeather, hackerNewsTop } from '../services/webService';
 import path from 'path';
 import fs from 'fs/promises';
 import { exec } from 'child_process';
@@ -70,6 +71,22 @@ export async function callMcpTool(req: AuthRequest, res: Response) {
       case 'git_commit': {
         const { stdout } = await execAsync(`git commit -m "${(args.message || '').replace(/"/g, '\\"')}"`, { cwd: targetPath });
         result = { stdout };
+        break;
+      }
+      case 'web_fetch': {
+        result = { content: await fetchUrl(args.url) };
+        break;
+      }
+      case 'wiki_search': {
+        result = { content: await wikiSummary(args.query) };
+        break;
+      }
+      case 'weather': {
+        result = { content: await openMeteoWeather(args.lat, args.lon) };
+        break;
+      }
+      case 'news': {
+        result = { content: await hackerNewsTop() };
         break;
       }
       default: res.status(400).json({ error: { message: `Unknown tool ${name}` } }); return;

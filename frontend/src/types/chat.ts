@@ -47,7 +47,8 @@ export type AgentMode =
   | 'write'
   | 'brainstorm'
   | 'file-manager'
-  | 'git';
+  | 'git'
+  | 'web';
 
 export interface AgentModeConfig {
   mode: AgentMode;
@@ -68,6 +69,7 @@ export const AGENT_MODES: AgentModeConfig[] = [
   { mode: 'brainstorm', label: 'Brainstorm', description: 'Generate ideas and creative solutions', icon: 'lightbulb' },
   { mode: 'file-manager', label: 'File Manager', description: 'Browse, read, write local files', icon: 'file' },
   { mode: 'git', label: 'Git Assistant', description: 'Git operations, commit, status', icon: 'git' },
+  { mode: 'web', label: 'Web Agent', description: 'Realtime data via free APIs', icon: 'search' },
 ];
 
 export interface ModelInfo {

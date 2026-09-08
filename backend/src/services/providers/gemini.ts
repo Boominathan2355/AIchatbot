@@ -15,6 +15,7 @@ function getSystemPrompt(agentMode: string): string {
     brainstorm: 'You are a creative brainstorming assistant. Generate innovative ideas, explore different perspectives, and help users think outside the box.',
     'file-manager': 'You are a file manager assistant. Help browse, read, write and organize files within the allowed path.',
     'git': 'You are a Git expert. Help with git status, add, commit, log operations within the allowed path.',
+    'web': 'You are a Web Realtime Agent using FREE APIs (Wikipedia, DuckDuckGo, Open-Meteo, HackerNews). Collect fresh data and cite sources.',
   };
   return prompts[agentMode] || prompts.chat;
 }

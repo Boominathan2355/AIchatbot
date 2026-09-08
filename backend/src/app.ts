@@ -14,6 +14,7 @@ import conversationRoutes from './routes/conversations';
 import fileRoutes from './routes/files';
 import gitRoutes from './routes/git';
 import mcpRoutes from './routes/mcp';
+import webRoutes from './routes/web';
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/git', gitRoutes);
 app.use('/api/mcp', mcpRoutes);
+app.use('/api/web', webRoutes);
 
 // --- Serve frontend in production (single Node) ---
 const candidates = [

@@ -116,6 +116,16 @@ const WELCOME_MESSAGES: Record<AgentMode, { title: string; subtitle: string; sug
       'Show git log',
     ],
   },
+  web: {
+    title: 'Web Agent',
+    subtitle: 'Realtime data via free APIs – no search cost.',
+    suggestions: [
+      'What is the weather in London today? (free)',
+      'Search Wikipedia for quantum computing',
+      'Top Hacker News stories today',
+      'Fetch and summarize https://example.com',
+    ],
+  },
 };
 
 export function WelcomeScreen({ agentMode }: WelcomeScreenProps) {

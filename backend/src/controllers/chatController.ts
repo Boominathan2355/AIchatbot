@@ -4,6 +4,7 @@ import { Attachment } from '../services/providers/types';
 import { createError } from '../middleware/errorHandler';
 import { Conversation } from '../models/Conversation';
 import { AuthRequest } from '../middleware/auth';
+import { collectWebContext } from '../services/webService';
 
 export async function handleChat(req: AuthRequest, res: Response) {
   const { message, model, apiKey, attachments, agentMode = 'chat', conversationId, provider = 'gemini', baseUrl } = req.body;
@@ -36,11 +37,19 @@ export async function handleChat(req: AuthRequest, res: Response) {
       } catch (e) { console.error('Failed to load history:', e); }
     }
 
+    // Web agent realtime fetch (free APIs, no paid search)
+    let webContext: string | null = null;
+    if (agentMode === 'web') {
+      try { webContext = await collectWebContext(message); } catch (e) { console.error('web collect failed', e); }
+    }
+
+    const enrichedMessage = webContext ? `${message}\n\n[Realtime Web Context (free APIs) - cite sources]:\n${webContext}` : message;
+
     const chatMessages: any[] = [
       ...history,
       {
         role: 'user' as const,
-        content: message,
+        content: enrichedMessage,
         attachments: attachments as Attachment[] | undefined,
         agentMode,
       },
@@ -132,7 +141,10 @@ export async function handleChatNonStream(req: AuthRequest, res: Response) {
       if (convNs?.messages) historyNs = convNs.messages.map((m: any) => ({ role: m.role, content: m.content, attachments: m.attachments }));
     } catch {}
   }
-  const chatMessagesNs: any[] = [...historyNs, { role: 'user' as const, content: message, attachments: attachments as Attachment[] | undefined, agentMode }];
+  let webContextNs: string | null = null;
+  if (agentMode === 'web') { try { webContextNs = await collectWebContext(message); } catch {} }
+  const enrichedNs = webContextNs ? `${message}\n\n[Realtime Web Context (free APIs)]:\n${webContextNs}` : message;
+  const chatMessagesNs: any[] = [...historyNs, { role: 'user' as const, content: enrichedNs, attachments: attachments as Attachment[] | undefined, agentMode }];
   (chatMessagesNs as any).agentMode = agentMode;
 
   const providerType = provider as ProviderType;

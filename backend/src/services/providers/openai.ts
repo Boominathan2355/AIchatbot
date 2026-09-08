@@ -33,6 +33,7 @@ function buildOpenAIMessages(messages: any[], agentMode?: string): any[] {
     brainstorm: 'You are a creative brainstorming assistant.',
     'file-manager': 'You are a file manager assistant. Help browse and manage files.',
     'git': 'You are a Git expert. Help with git operations.',
+    'web': 'You are a Web Realtime Agent using FREE APIs (Wikipedia, DuckDuckGo, Open-Meteo, HackerNews). Collect fresh data.',
   };
 
   const openaiMessages: any[] = [];
