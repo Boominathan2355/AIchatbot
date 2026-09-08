@@ -22,7 +22,8 @@ export async function register(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const existingUser = await User.findOne({ username });
+    const cleanUsername = String(username).trim();
+    const existingUser = await User.findOne({ username: { $regex: `^${cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
     if (existingUser) {
       res.status(409).json({ error: { message: 'Username already taken' } });
       return;
@@ -32,7 +33,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = new User({ username, password: hashedPassword });
+    const user = new User({ username: cleanUsername, password: hashedPassword });
     await user.save();
 
     const token = generateToken(user._id.toString());
@@ -56,7 +57,8 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const user = await User.findOne({ username: String(login).toLowerCase().trim() });
+    const cleanLogin = String(login).trim();
+    const user = await User.findOne({ username: { $regex: `^${cleanLogin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
     if (!user) {
       res.status(401).json({ error: { message: 'Invalid credentials' } });
       return;
