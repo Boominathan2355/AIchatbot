@@ -48,7 +48,7 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Settings">
+    <Modal isOpen={isOpen} onClose={onClose} title="Settings" size="lg">
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

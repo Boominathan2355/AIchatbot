@@ -249,7 +249,7 @@ function ChatApp({ conversationId }: { conversationId: string | null }) {
         models={models}
         onRefreshModels={onRefreshModels}
       />
-      <ToolsPanel isOpen={showTools} onClose={() => setShowTools(false)} settings={settings} />
+      <ToolsPanel isOpen={showTools} onClose={() => setShowTools(false)} settings={settings} onUpdateSettings={updateSettings} />
     </div>
   );
 }
