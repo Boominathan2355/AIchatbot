@@ -42,14 +42,23 @@ export function ChatArea({ messages, isStreaming, streamingContent, agentMode, o
         )})}
 
         {isStreaming && streamingContent && (
-          <MessageBubble
-            message={{
-              id: 'streaming',
-              role: 'assistant',
-              content: streamingContent,
-              createdAt: new Date().toISOString(),
-            }}
-          />
+          <div className="animate-fade-in">
+            <div className="flex items-center gap-2 mb-1 ml-11">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                <span className="w-1.5 h-1.5 bg-violet-600 dark:bg-violet-400 rounded-full animate-pulse" />
+                Live streaming
+              </span>
+              <span className="text-[11px] text-gray-400">{streamingContent.length} chars</span>
+            </div>
+            <MessageBubble
+              message={{
+                id: 'streaming',
+                role: 'assistant',
+                content: streamingContent + ' ▌',
+                createdAt: new Date().toISOString(),
+              }}
+            />
+          </div>
         )}
 
         {isStreaming && !streamingContent && (
