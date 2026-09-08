@@ -9,6 +9,19 @@ interface MarkdownRendererProps {
   content: string;
 }
 
+function childrenToText(children: ReactNode): string {
+  if (children == null) return '';
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (typeof children === 'boolean') return '';
+  if (Array.isArray(children)) return children.map(childrenToText).join('');
+  if (typeof children === 'object' && 'props' in children) {
+    const el = children as { props?: { children?: ReactNode } };
+    return childrenToText(el.props?.children);
+  }
+  return '';
+}
+
 function MermaidDiagram({ code }: { code: string }) {
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
@@ -115,7 +128,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         components={{
           code({ node, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
-            const codeString = String(children).replace(/\n$/, '');
+            const codeString = childrenToText(children).replace(/\n$/, '');
+            console.log('[code component] children type:', typeof children, 'isArray:', Array.isArray(children), 'result:', codeString.slice(0, 100));
 
             if (match) {
               return <CodeBlock language={match[1]} children={codeString} />;

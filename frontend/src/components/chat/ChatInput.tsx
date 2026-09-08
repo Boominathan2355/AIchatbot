@@ -1,4 +1,4 @@
-import { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
 import { Attachment, AgentMode, AGENT_MODES } from '../../types';
 import { TextArea } from '../ui/TextArea';
 import { AttachmentBar } from './AttachmentBar';
@@ -12,6 +12,7 @@ interface ChatInputProps {
   agentMode: AgentMode;
   onAgentModeChange: (mode: AgentMode) => void;
   disabled?: boolean;
+  suggestionText?: string;
 }
 
 export function ChatInput({
@@ -21,6 +22,7 @@ export function ChatInput({
   agentMode,
   onAgentModeChange,
   disabled,
+  suggestionText,
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -28,6 +30,10 @@ export function ChatInput({
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (suggestionText) setMessage(suggestionText);
+  }, [suggestionText]);
 
   const canSend = (message.trim() || attachments.length > 0) && !isStreaming && !uploading;
 

@@ -45,6 +45,7 @@ export function ChatPage({ conversationId }: ChatPageProps) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [conversationLoaded, setConversationLoaded] = useState(false);
+  const [suggestionText, setSuggestionText] = useState('');
 
   const { messages, isStreaming, streamingContent, error, sendMessage, stopStreaming, clearMessages, setInitialMessages } = useChat(
     conversationId,
@@ -222,7 +223,7 @@ export function ChatPage({ conversationId }: ChatPageProps) {
           streamingContent={streamingContent}
           agentMode={agentMode}
           onRetry={handleRetry}
-          onSuggestionClick={handleSend}
+          onSuggestionClick={(text) => setSuggestionText(text)}
         />
 
         {error && (
@@ -238,6 +239,7 @@ export function ChatPage({ conversationId }: ChatPageProps) {
           agentMode={agentMode}
           onAgentModeChange={setAgentMode}
           disabled={loading || !conversationLoaded}
+          suggestionText={suggestionText}
         />
       </main>
 
