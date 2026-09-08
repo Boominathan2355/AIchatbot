@@ -96,9 +96,15 @@ export class GeminiProvider implements Provider {
         return;
       } catch (err: any) {
         lastErr = err;
-        const is503 = err.status === 503 || err.message?.includes('503') || err.message?.includes('high demand');
-        if (!is503 || m === chain[chain.length - 1]) throw err;
-        console.warn(`Model ${m} failed 503, trying fallback ${chain[chain.indexOf(m)+1]}`);
+        const msg = err.message || '';
+        const isRetryable = err.status === 503 || err.status === 429 || msg.includes('503') || msg.includes('429') || msg.includes('high demand') || msg.includes('quota') || msg.includes('Too Many Requests');
+        // For 429 quota, don't fallback infinitely - surface friendly error after first fallback attempt
+        const isQuota = err.status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests');
+        if (isQuota) {
+          throw new Error(`QUOTA_EXCEEDED: You exceeded your current quota (model ${m} 429). Please check your plan/billing at https://ai.google.dev/gemini-api/docs/billing, or try again later / switch to Ollama/ChatGPT. Original: ${msg}`);
+        }
+        if (!isRetryable || m === chain[chain.length - 1]) throw err;
+        console.warn(`Model ${m} failed ${err.status || ''}, trying fallback ${chain[chain.indexOf(m)+1]}`);
       }
     }
     throw lastErr;
@@ -121,8 +127,13 @@ export class GeminiProvider implements Provider {
         return { content: result.response.text() };
       } catch (err: any) {
         lastErr = err;
-        const is503 = err.status === 503 || err.message?.includes('503');
-        if (!is503 || m === chain[chain.length - 1]) throw err;
+        const msg = err.message || '';
+        const isRetryable = err.status === 503 || msg.includes('503') || msg.includes('high demand');
+        const isQuota = err.status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests');
+        if (isQuota) {
+          throw new Error(`QUOTA_EXCEEDED: You exceeded your current quota (model ${m} 429). Please check your plan/billing, or try again later / switch provider. Original: ${msg}`);
+        }
+        if (!isRetryable || m === chain[chain.length - 1]) throw err;
         console.warn(`Model ${m} failed, fallback ${chain[chain.indexOf(m)+1]}`);
       }
     }
