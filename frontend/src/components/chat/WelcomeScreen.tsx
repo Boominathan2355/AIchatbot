@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon';
 
 interface WelcomeScreenProps {
   agentMode: AgentMode;
+  onSuggestionClick?: (text: string) => void;
 }
 
 const WELCOME_MESSAGES: Record<AgentMode, { title: string; subtitle: string; suggestions: string[] }> = {
@@ -98,7 +99,7 @@ const WELCOME_MESSAGES: Record<AgentMode, { title: string; subtitle: string; sug
   },
 };
 
-export function WelcomeScreen({ agentMode }: WelcomeScreenProps) {
+export function WelcomeScreen({ agentMode, onSuggestionClick }: WelcomeScreenProps) {
   const config = WELCOME_MESSAGES[agentMode];
 
   return (
@@ -117,6 +118,7 @@ export function WelcomeScreen({ agentMode }: WelcomeScreenProps) {
           {config.suggestions.map((suggestion, index) => (
             <button
               key={index}
+              onClick={() => onSuggestionClick?.(suggestion)}
               className="group text-left px-4 py-3 bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-200/80 dark:border-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600/50 rounded-xl transition-all duration-200 text-[0.8125rem] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 shadow-sm hover:shadow"
             >
               <span className="line-clamp-2">{suggestion}</span>

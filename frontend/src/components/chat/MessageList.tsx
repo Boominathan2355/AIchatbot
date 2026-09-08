@@ -10,6 +10,7 @@ interface MessageListProps {
   streamingContent: string;
   agentMode: AgentMode;
   onRetry?: (content: string) => void;
+  onSuggestionClick?: (text: string) => void;
 }
 
 function TypingIndicator() {
@@ -31,7 +32,7 @@ function TypingIndicator() {
   );
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, agentMode, onRetry }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, agentMode, onRetry, onSuggestionClick }: MessageListProps) {
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function MessageList({ messages, isStreaming, streamingContent, agentMode
   }, [messages, streamingContent]);
 
   if (messages.length === 0 && !isStreaming) {
-    return <WelcomeScreen agentMode={agentMode} />;
+    return <WelcomeScreen agentMode={agentMode} onSuggestionClick={onSuggestionClick} />;
   }
 
   const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');

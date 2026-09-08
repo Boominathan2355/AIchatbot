@@ -222,6 +222,7 @@ export function ChatPage({ conversationId }: ChatPageProps) {
           streamingContent={streamingContent}
           agentMode={agentMode}
           onRetry={handleRetry}
+          onSuggestionClick={handleSend}
         />
 
         {error && (

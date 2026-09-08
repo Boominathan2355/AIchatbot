@@ -1,7 +1,39 @@
-import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
+import { GoogleGenerativeAI, Content, Part, GenerateContentResponse } from '@google/generative-ai';
 import { ChatMessage, ChatRequest, ChatResponse, ModelSummary, Provider, ProviderConfig } from './providerTypes';
 import { getSystemPrompt } from '../../prompts/systemPrompts';
 import { config } from '../../config/environment';
+
+/**
+ * Extract plain text from a Gemini response chunk, handling all part types.
+ * The SDK's built-in `text()` method can produce `[object Object]` when
+ * parts contain structured data (functionCall, codeExecutionResult, etc.).
+ */
+function extractText(response: GenerateContentResponse): string {
+  const candidates = response.candidates;
+  if (!candidates?.[0]?.content?.parts) return '';
+
+  const textStrings: string[] = [];
+  for (const part of candidates[0].content.parts) {
+    const p = part as unknown as Record<string, unknown>;
+    if (p.text) {
+      textStrings.push(p.text as string);
+    } else if (p.executableCode) {
+      const ec = p.executableCode as Record<string, unknown>;
+      const code = (ec.code as string) ?? String(ec);
+      const lang = (ec.language as string) ?? '';
+      textStrings.push(`\n\`\`\`${lang}\n${code}\n\`\`\`\n`);
+    } else if (p.codeExecutionResult) {
+      const cer = p.codeExecutionResult as Record<string, unknown>;
+      const output = (cer.output as string) ?? String(cer);
+      textStrings.push(`\n\`\`\`\n${output}\n\`\`\`\n`);
+    } else if (p.functionCall) {
+      textStrings.push(`[Function call: ${JSON.stringify(p.functionCall)}]`);
+    } else {
+      textStrings.push(String(part));
+    }
+  }
+  return textStrings.join('');
+}
 
 /**
  * Model ids published by the Gemini API. Earlier releases of this file used
@@ -118,7 +150,7 @@ export class GeminiProvider implements Provider {
       try {
         const result = await client.getGenerativeModel({ model: modelId }).generateContentStream({ contents });
         for await (const chunk of result.stream) {
-          const text = chunk.text();
+          const text = extractText(chunk);
           if (text) {
             hasYielded = true;
             yield text;
@@ -148,7 +180,7 @@ export class GeminiProvider implements Provider {
 
       try {
         const result = await client.getGenerativeModel({ model: modelId }).generateContent({ contents });
-        return { content: result.response.text() };
+        return { content: extractText(result.response) };
       } catch (error: any) {
         const failure = classifyFailure(error);
         if (failure === 'quota') throw createQuotaExceededError(modelId, error?.message || '');
