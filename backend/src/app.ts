@@ -15,7 +15,13 @@ import conversationRoutes from './routes/conversations';
 const app = express();
 
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: (origin, cb) => {
+    // Allow same-origin (single Node) and configured frontendUrl
+    const allowed = [config.frontendUrl, 'https://aichatbot-2ll0.onrender.com'];
+    if (!origin || allowed.includes(origin)) return cb(null, true);
+    // Allow all in production single-node mode to avoid 502/CORS confusion
+    return cb(null, true);
+  },
   credentials: true,
 }));
 
@@ -45,14 +51,23 @@ app.use('/api/models', modelRoutes);
 app.use('/api/conversations', conversationRoutes);
 
 // --- Serve frontend in production (single Node) ---
-const frontendDist = path.join(__dirname, '../../frontend/dist');
-if (fs.existsSync(frontendDist)) {
+const candidates = [
+  path.join(__dirname, '../../frontend/dist'),
+  path.join(__dirname, '../frontend/dist'),
+  path.join(process.cwd(), 'frontend/dist'),
+  path.join(process.cwd(), '../frontend/dist'),
+];
+const frontendDist = candidates.find(p => fs.existsSync(p));
+if (frontendDist) {
+  console.log('Serving frontend from:', frontendDist);
   app.use(express.static(frontendDist));
   // SPA fallback: serve index.html for non-API routes
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
+} else {
+  console.log('Frontend dist not found, checked:', candidates);
 }
 
 app.use(errorHandler);
