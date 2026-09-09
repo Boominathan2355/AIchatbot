@@ -239,7 +239,14 @@ export async function streamChatCompletion(req: AuthenticatedRequest, res: Respo
     res.end();
   } catch (error: any) {
     console.error('[chat] stream failed:', error);
-    writeEvent(res, { error: error.message || 'Failed to generate response', done: true });
+
+    let errorMessage = error.message || 'Failed to generate response';
+    if (error.cause?.code === 'ECONNREFUSED') {
+      const baseUrl = body.baseUrl || '';
+      errorMessage = `Cannot connect to ${baseUrl || 'the local model server'}. Make sure your model server (Ollama/llama.cpp) is running and accessible at this URL.`;
+    }
+
+    writeEvent(res, { error: errorMessage, done: true });
     res.end();
   }
 }
