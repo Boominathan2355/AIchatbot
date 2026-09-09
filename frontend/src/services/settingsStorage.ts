@@ -1,4 +1,4 @@
-import { Settings } from '../types';
+import { ProviderType, Settings } from '../types';
 
 const SETTINGS_STORAGE_KEY = 'gemini-chat-settings';
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -9,6 +9,7 @@ const RETIRED_MODEL_IDS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-
 export const DEFAULT_SETTINGS: Settings = {
   provider: 'gemini',
   apiKey: '',
+  apiKeys: {},
   baseUrl: '',
   model: DEFAULT_MODEL,
   theme: 'dark',
@@ -25,9 +26,18 @@ export function loadSettings(): Settings {
     if (!stored) return DEFAULT_SETTINGS;
 
     const parsed = JSON.parse(stored);
+
+    // Migrate old single apiKey into per-provider apiKeys map
+    const apiKeys: Partial<Record<ProviderType, string>> = parsed.apiKeys || {};
+    const providerType = parsed.provider as ProviderType;
+    if (parsed.apiKey && providerType && !apiKeys[providerType]) {
+      apiKeys[providerType] = parsed.apiKey;
+    }
+
     return {
       provider: parsed.provider || DEFAULT_SETTINGS.provider,
       apiKey: parsed.apiKey || '',
+      apiKeys,
       baseUrl: parsed.baseUrl || '',
       model: normalizeModel(parsed.model),
       theme: parsed.theme || DEFAULT_SETTINGS.theme,

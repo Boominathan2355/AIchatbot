@@ -46,7 +46,9 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   useEffect(() => {
     if (!isOpen) return;
     setProvider(settings.provider);
-    setApiKey(settings.apiKey);
+    // Restore per-provider key from the map, falling back to legacy apiKey
+    const savedKey = settings.apiKeys?.[settings.provider] || settings.apiKey || '';
+    setApiKey(savedKey);
     setBaseUrl(settings.baseUrl || '');
     setMemoryEnabled(settings.memoryEnabled !== false);
 
@@ -64,7 +66,9 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   }, [isOpen, settings]);
 
   const handleSave = async () => {
-    onUpdateSettings({ provider, apiKey, baseUrl, memoryEnabled });
+    // Store key in per-provider map
+    const updatedApiKeys = { ...settings.apiKeys, [provider]: apiKey };
+    onUpdateSettings({ provider, apiKey, apiKeys: updatedApiKeys, baseUrl, memoryEnabled });
 
     // Save memory to API
     try {
@@ -79,7 +83,10 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
 
   const handleProviderChange = (nextProvider: ProviderType) => {
     setProvider(nextProvider);
-    onRefreshModels(nextProvider, apiKey, baseUrl);
+    // Restore saved key for the newly selected provider
+    const savedKey = settings.apiKeys?.[nextProvider] || '';
+    setApiKey(savedKey);
+    onRefreshModels(nextProvider, savedKey, baseUrl);
   };
 
   const isLocalProvider = provider === 'ollama' || provider === 'llamacpp';

@@ -69,6 +69,7 @@ export interface ModelInfo {
 export interface Settings {
   provider: ProviderType;
   apiKey: string;
+  apiKeys?: Partial<Record<ProviderType, string>>;
   baseUrl?: string;
   model: string;
   theme: 'light' | 'dark' | 'system';
