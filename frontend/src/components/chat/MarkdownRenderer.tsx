@@ -87,7 +87,7 @@ function CodeBlock({ language, rawText, children }: { language: string; rawText:
   }
 
   return (
-    <div className="my-3 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700/50">
+    <div className="my-3 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700/50 w-full">
       <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700/50">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{language || 'code'}</span>
         <button
@@ -108,8 +108,8 @@ function CodeBlock({ language, rawText, children }: { language: string; rawText:
         </button>
       </div>
       <div className="overflow-x-auto">
-        <pre className="p-4 bg-gray-900 dark:bg-[#0d1117] text-gray-100 text-[0.8125rem] leading-relaxed">
-          <code className={`language-${language}`}>{children}</code>
+        <pre className="p-4 bg-gray-900 dark:bg-[#0d1117] text-gray-100 text-[0.8125rem] leading-relaxed min-w-0">
+          <code className={`language-${language} whitespace-pre`}>{children}</code>
         </pre>
       </div>
       {['html', 'css', 'javascript', 'js', 'jsx', 'typescript', 'tsx'].includes(language.toLowerCase()) && (

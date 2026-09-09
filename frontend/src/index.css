@@ -69,10 +69,13 @@ body {
   background: transparent;
   padding: 0;
   margin: 0;
+  width: 100%;
 }
 
 .prose code {
   font-size: 0.875rem;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)) {

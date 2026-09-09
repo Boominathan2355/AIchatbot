@@ -91,7 +91,7 @@ export function MessageBubble({ message, isLast, onRetry }: MessageBubbleProps) 
         </div>
 
         {/* Content */}
-        <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-col gap-1 min-w-0 max-w-full">
           <div className={`rounded-2xl px-4 py-2.5 ${
             isUser
               ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
