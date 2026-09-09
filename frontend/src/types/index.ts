@@ -71,6 +71,7 @@ export interface Settings {
   apiKey: string;
   apiKeys?: Partial<Record<ProviderType, string>>;
   baseUrl?: string;
+  baseUrls?: Partial<Record<ProviderType, string>>;
   model: string;
   theme: 'light' | 'dark' | 'system';
   memoryEnabled?: boolean;

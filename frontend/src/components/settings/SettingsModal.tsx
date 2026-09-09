@@ -49,7 +49,9 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
     // Restore per-provider key from the map, falling back to legacy apiKey
     const savedKey = settings.apiKeys?.[settings.provider] || settings.apiKey || '';
     setApiKey(savedKey);
-    setBaseUrl(settings.baseUrl || '');
+    // Restore per-provider baseUrl from the map, falling back to legacy baseUrl
+    const savedBaseUrl = settings.baseUrls?.[settings.provider] || settings.baseUrl || '';
+    setBaseUrl(savedBaseUrl);
     setMemoryEnabled(settings.memoryEnabled !== false);
 
     // Load memory from API
@@ -66,9 +68,10 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   }, [isOpen, settings]);
 
   const handleSave = async () => {
-    // Store key in per-provider map
+    // Store key and baseUrl in per-provider maps
     const updatedApiKeys = { ...settings.apiKeys, [provider]: apiKey };
-    onUpdateSettings({ provider, apiKey, apiKeys: updatedApiKeys, baseUrl, memoryEnabled });
+    const updatedBaseUrls = { ...settings.baseUrls, [provider]: baseUrl };
+    onUpdateSettings({ provider, apiKey, apiKeys: updatedApiKeys, baseUrl, baseUrls: updatedBaseUrls, memoryEnabled });
 
     // Save memory to API
     try {
@@ -83,10 +86,12 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
 
   const handleProviderChange = (nextProvider: ProviderType) => {
     setProvider(nextProvider);
-    // Restore saved key for the newly selected provider
+    // Restore saved key and baseUrl for the newly selected provider
     const savedKey = settings.apiKeys?.[nextProvider] || '';
+    const savedBaseUrl = settings.baseUrls?.[nextProvider] || '';
     setApiKey(savedKey);
-    onRefreshModels(nextProvider, savedKey, baseUrl);
+    setBaseUrl(savedBaseUrl);
+    onRefreshModels(nextProvider, savedKey, savedBaseUrl);
   };
 
   const isLocalProvider = provider === 'ollama' || provider === 'llamacpp';
@@ -195,6 +200,9 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
                         <p>http://localhost:8080/v1</p>
                       </div>
                     )}
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 pt-1">
+                      Local providers require the backend to run on the same machine. If deployed on Render, use Gemini or ChatGPT instead.
+                    </p>
                   </div>
                 </>
               )}

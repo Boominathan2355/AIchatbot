@@ -34,11 +34,18 @@ export function loadSettings(): Settings {
       apiKeys[providerType] = parsed.apiKey;
     }
 
+    // Migrate old single baseUrl into per-provider baseUrls map
+    const baseUrls: Partial<Record<ProviderType, string>> = parsed.baseUrls || {};
+    if (parsed.baseUrl && providerType && !baseUrls[providerType]) {
+      baseUrls[providerType] = parsed.baseUrl;
+    }
+
     return {
       provider: parsed.provider || DEFAULT_SETTINGS.provider,
       apiKey: parsed.apiKey || '',
       apiKeys,
       baseUrl: parsed.baseUrl || '',
+      baseUrls,
       model: normalizeModel(parsed.model),
       theme: parsed.theme || DEFAULT_SETTINGS.theme,
       memoryEnabled: parsed.memoryEnabled !== false,
