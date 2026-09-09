@@ -112,22 +112,22 @@ async function* readStreamedContent(body: ReadableStream<Uint8Array>): AsyncGene
 export class OpenAICompatibleProvider implements Provider {
   constructor(private readonly type: OpenAICompatibleProviderType) {}
 
-  async *streamChat({ messages, model, agentMode, providerConfig }: ChatRequest): AsyncGenerator<string, void, unknown> {
+  async *streamChat({ messages, model, agentMode, providerConfig, personalization }: ChatRequest): AsyncGenerator<string, void, unknown> {
     const response = await requestChatCompletion(
       resolveBaseUrl(this.type, providerConfig.baseUrl),
       resolveApiKey(this.type, providerConfig.apiKey),
-      { model, messages: toOpenAIMessages(messages, getSystemPrompt(agentMode)), stream: true }
+      { model, messages: toOpenAIMessages(messages, getSystemPrompt(agentMode, personalization)), stream: true }
     );
 
     if (!response.body) throw new Error('Provider returned an empty stream');
     yield* readStreamedContent(response.body);
   }
 
-  async chat({ messages, model, agentMode, providerConfig }: ChatRequest): Promise<ChatResponse> {
+  async chat({ messages, model, agentMode, providerConfig, personalization }: ChatRequest): Promise<ChatResponse> {
     const response = await requestChatCompletion(
       resolveBaseUrl(this.type, providerConfig.baseUrl),
       resolveApiKey(this.type, providerConfig.apiKey),
-      { model, messages: toOpenAIMessages(messages, getSystemPrompt(agentMode)), stream: false }
+      { model, messages: toOpenAIMessages(messages, getSystemPrompt(agentMode, personalization)), stream: false }
     );
 
     const payload: any = await response.json();

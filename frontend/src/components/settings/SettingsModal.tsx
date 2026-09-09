@@ -7,7 +7,7 @@ import { ModelSelector } from './ModelSelector';
 import {
   EyeIcon, EyeOffIcon, CheckIcon,
   SettingsIcon, SunIcon, MoonIcon,
-  UserIcon, CodeIcon, ShieldIcon
+  UserIcon, CodeIcon
 } from '../ui/Icons';
 
 const SAVED_INDICATOR_MS = 2000;
@@ -45,6 +45,7 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   const [showApiKey, setShowApiKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tools, setTools] = useState<ToolDefinition[]>([]);
+  const [memoryEnabled, setMemoryEnabled] = useState(settings.memoryEnabled !== false);
 
   // Personalization
   const [nickname, setNickname] = useState(() => localStorage.getItem('user_nickname') || '');
@@ -59,6 +60,7 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
     setAllowedPath(settings.allowedPath || '');
     setEnableFileManager(Boolean(settings.enableFileManager));
     setEnableGit(Boolean(settings.enableGit));
+    setMemoryEnabled(settings.memoryEnabled !== false);
     apiClient
       .listTools()
       .then(setTools)
@@ -66,7 +68,7 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
   }, [isOpen, settings]);
 
   const handleSave = () => {
-    onUpdateSettings({ provider, apiKey, baseUrl, allowedPath, enableFileManager, enableGit });
+    onUpdateSettings({ provider, apiKey, baseUrl, allowedPath, enableFileManager, enableGit, memoryEnabled });
     localStorage.setItem('user_nickname', nickname);
     localStorage.setItem('user_occupation', occupation);
     localStorage.setItem('user_more_about', moreAbout);
@@ -221,9 +223,17 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
                     Let the AI personalize responses based on your profile
                   </p>
                 </div>
-                <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative">
-                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform" />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setMemoryEnabled(!memoryEnabled)}
+                  className={`w-10 h-5 rounded-full relative transition-colors ${
+                    memoryEnabled ? 'bg-violet-600' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    memoryEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                  }`} />
+                </button>
               </div>
             </section>
           </>

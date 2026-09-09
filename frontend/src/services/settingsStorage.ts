@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   allowedPath: '',
   enableFileManager: false,
   enableGit: false,
+  memoryEnabled: true,
 };
 
 function normalizeModel(model: unknown): string {
@@ -36,6 +37,7 @@ export function loadSettings(): Settings {
       allowedPath: parsed.allowedPath || '',
       enableFileManager: Boolean(parsed.enableFileManager),
       enableGit: Boolean(parsed.enableGit),
+      memoryEnabled: parsed.memoryEnabled !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;

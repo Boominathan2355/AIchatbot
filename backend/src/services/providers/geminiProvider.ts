@@ -138,9 +138,9 @@ function createQuotaExceededError(modelId: string, originalMessage: string): Err
 }
 
 export class GeminiProvider implements Provider {
-  async *streamChat({ messages, model, agentMode, providerConfig }: ChatRequest): AsyncGenerator<string, void, unknown> {
+  async *streamChat({ messages, model, agentMode, providerConfig, personalization }: ChatRequest): AsyncGenerator<string, void, unknown> {
     const client = new GoogleGenerativeAI(resolveApiKey(providerConfig));
-    const contents = toGeminiContents(messages, getSystemPrompt(agentMode));
+    const contents = toGeminiContents(messages, getSystemPrompt(agentMode, personalization));
     const chain = buildFallbackChain(model);
 
     for (let index = 0; index < chain.length; index += 1) {
@@ -170,9 +170,9 @@ export class GeminiProvider implements Provider {
     }
   }
 
-  async chat({ messages, model, agentMode, providerConfig }: ChatRequest): Promise<ChatResponse> {
+  async chat({ messages, model, agentMode, providerConfig, personalization }: ChatRequest): Promise<ChatResponse> {
     const client = new GoogleGenerativeAI(resolveApiKey(providerConfig));
-    const contents = toGeminiContents(messages, getSystemPrompt(agentMode));
+    const contents = toGeminiContents(messages, getSystemPrompt(agentMode, personalization));
     const chain = buildFallbackChain(model);
 
     for (let index = 0; index < chain.length; index += 1) {

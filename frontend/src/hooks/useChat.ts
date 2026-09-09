@@ -54,7 +54,8 @@ export function useChat(
   model: string,
   agentMode: AgentMode,
   provider: ProviderType = 'gemini',
-  baseUrl?: string
+  baseUrl?: string,
+  personalization?: { nickname?: string; occupation?: string; moreAbout?: string; memoryEnabled?: boolean }
 ) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -89,7 +90,8 @@ export function useChat(
           (overrideConversationId ?? conversationId) || undefined,
           provider,
           baseUrl,
-          abortController.signal
+          abortController.signal,
+          personalization
         );
         const reader = stream.getReader();
 
@@ -125,7 +127,7 @@ export function useChat(
         abortControllerRef.current = null;
       }
     },
-    [conversationId, model, agentMode, provider, baseUrl, isStreaming]
+    [conversationId, model, agentMode, provider, baseUrl, isStreaming, personalization]
   );
 
   const stopStreaming = useCallback(() => {

@@ -57,6 +57,24 @@ export function isAgentMode(value: unknown): value is AgentMode {
 }
 
 /** Returns the system prompt for an agent mode, falling back to the default mode. */
-export function getSystemPrompt(agentMode?: string): string {
-  return SYSTEM_PROMPTS[isAgentMode(agentMode) ? agentMode : DEFAULT_AGENT_MODE];
+export function getSystemPrompt(agentMode?: string, personalization?: { nickname?: string; occupation?: string; moreAbout?: string; memoryEnabled?: boolean }): string {
+  const basePrompt = SYSTEM_PROMPTS[isAgentMode(agentMode) ? agentMode : DEFAULT_AGENT_MODE];
+
+  if (!personalization?.memoryEnabled) return basePrompt;
+
+  const sections: string[] = [];
+
+  if (personalization.nickname) {
+    sections.push(`The user's name is ${personalization.nickname}.`);
+  }
+  if (personalization.occupation) {
+    sections.push(`They work as: ${personalization.occupation}.`);
+  }
+  if (personalization.moreAbout) {
+    sections.push(`Additional context about the user: ${personalization.moreAbout}`);
+  }
+
+  if (sections.length === 0) return basePrompt;
+
+  return `${sections.join(' ')}\n\n${basePrompt}`;
 }

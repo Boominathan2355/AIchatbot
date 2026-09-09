@@ -114,7 +114,8 @@ class ApiClient {
     conversationId?: string,
     provider: string = 'gemini',
     baseUrl?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    personalization?: { nickname?: string; occupation?: string; moreAbout?: string; memoryEnabled?: boolean }
   ): Promise<ReadableStream<string>> {
     let response: Response;
     try {
@@ -131,6 +132,7 @@ class ApiClient {
           conversationId,
           provider,
           baseUrl: baseUrl || undefined,
+          personalization,
         }),
       });
     } catch (error: any) {

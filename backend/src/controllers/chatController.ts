@@ -20,6 +20,12 @@ interface ChatRequestBody {
   agentMode: string;
   conversationId?: string;
   provider: ProviderType;
+  personalization?: {
+    nickname?: string;
+    occupation?: string;
+    moreAbout?: string;
+    memoryEnabled?: boolean;
+  };
 }
 
 const DEFAULT_PROVIDER: ProviderType = 'gemini';
@@ -54,6 +60,7 @@ function parseChatRequestBody(body: any): ChatRequestBody {
     agentMode: typeof body.agentMode === 'string' ? body.agentMode : DEFAULT_AGENT_MODE,
     conversationId: body.conversationId || undefined,
     provider: isProviderType(body.provider) ? body.provider : DEFAULT_PROVIDER,
+    personalization: body.personalization || undefined,
   };
 }
 
@@ -182,6 +189,7 @@ async function buildProviderRequest(req: AuthenticatedRequest, body: ChatRequest
     model: body.model || resolveDefaultModel(body.provider),
     agentMode: body.agentMode,
     providerConfig: { type: body.provider, apiKey: body.apiKey, baseUrl: body.baseUrl },
+    personalization: body.personalization,
   };
 }
 

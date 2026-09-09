@@ -75,6 +75,7 @@ export interface Settings {
   allowedPath?: string;
   enableFileManager?: boolean;
   enableGit?: boolean;
+  memoryEnabled?: boolean;
 }
 
 export interface AuthUser {

@@ -37,6 +37,12 @@ export interface ChatRequest {
   /** Selects the shared system prompt; see prompts/systemPrompts.ts. */
   agentMode?: string;
   providerConfig: ProviderConfig;
+  personalization?: {
+    nickname?: string;
+    occupation?: string;
+    moreAbout?: string;
+    memoryEnabled?: boolean;
+  };
 }
 
 export interface ChatResponse {

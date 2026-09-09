@@ -52,7 +52,13 @@ export function ChatPage({ conversationId }: ChatPageProps) {
     settings.model,
     agentMode,
     settings.provider,
-    settings.baseUrl
+    settings.baseUrl,
+    {
+      nickname: localStorage.getItem('user_nickname') || undefined,
+      occupation: localStorage.getItem('user_occupation') || undefined,
+      moreAbout: localStorage.getItem('user_more_about') || undefined,
+      memoryEnabled: settings.memoryEnabled,
+    }
   );
 
   const loadConversations = useCallback(async () => {
