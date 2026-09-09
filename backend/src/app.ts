@@ -14,6 +14,7 @@ import conversationRoutes from './routes/conversationRoutes';
 import fileRoutes from './routes/fileRoutes';
 import gitRoutes from './routes/gitRoutes';
 import toolRoutes from './routes/toolRoutes';
+import memoryRoutes from './routes/memoryRoutes';
 import webRoutes from './routes/webRoutes';
 
 const REQUEST_BODY_LIMIT = '50mb';
@@ -77,6 +78,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/git', gitRoutes);
 app.use('/api/tools', toolRoutes);
+app.use('/api/memory', memoryRoutes);
 app.use('/api/web', webRoutes);
 
 // Serve the built frontend from the same process in production.

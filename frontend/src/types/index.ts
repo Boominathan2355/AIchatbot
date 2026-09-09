@@ -72,9 +72,6 @@ export interface Settings {
   baseUrl?: string;
   model: string;
   theme: 'light' | 'dark' | 'system';
-  allowedPath?: string;
-  enableFileManager?: boolean;
-  enableGit?: boolean;
   memoryEnabled?: boolean;
 }
 

@@ -22,12 +22,11 @@ interface CreateConversationInput {
 
 /**
  * Thin fetch wrapper for the backend API. Holds the auth token and the
- * user's provider key / allowed path so every request carries them.
+ * user's provider key so every request carries them.
  */
 class ApiClient {
   private providerApiKey = '';
   private authToken = '';
-  private allowedPath = '';
 
   setProviderApiKey(key: string): void {
     this.providerApiKey = key;
@@ -37,14 +36,9 @@ class ApiClient {
     this.authToken = token;
   }
 
-  setAllowedPath(allowedPath: string): void {
-    this.allowedPath = allowedPath;
-  }
-
   private buildHeaders(includeProviderKey = false): Record<string, string> {
     const headers: Record<string, string> = {};
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
-    if (this.allowedPath) headers['X-Allowed-Path'] = this.allowedPath;
     // Sent as a header rather than a query parameter so the key never lands
     // in access logs or browser history.
     if (includeProviderKey && this.providerApiKey) headers['X-Provider-Key'] = this.providerApiKey;
@@ -101,6 +95,20 @@ class ApiClient {
   async getCurrentUser(): Promise<AuthUser> {
     const { user } = await this.requestData<{ user: AuthUser }>('/auth/profile');
     return user;
+  }
+
+  // Memory
+
+  getMemory(): Promise<{ nickname: string; occupation: string; moreAbout: string; enabled: boolean }> {
+    return this.requestData('/memory');
+  }
+
+  saveMemory(data: { nickname: string; occupation: string; moreAbout: string; enabled: boolean }): Promise<void> {
+    return this.request('/memory', {
+      method: 'PUT',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify(data),
+    }) as Promise<any>;
   }
 
   // Chat
@@ -202,37 +210,6 @@ class ApiClient {
 
   listTools(): Promise<ToolDefinition[]> {
     return this.requestData<ToolDefinition[]>('/tools');
-  }
-
-  // Files
-
-  listFiles(directoryPath?: string): Promise<unknown> {
-    const query = directoryPath ? `?path=${encodeURIComponent(directoryPath)}` : '';
-    return this.requestData(`/files/list${query}`);
-  }
-
-  readFile(filePath: string): Promise<unknown> {
-    return this.requestData(`/files/read?path=${encodeURIComponent(filePath)}`);
-  }
-
-  writeFile(filePath: string, content: string): Promise<unknown> {
-    return this.requestData('/files/write', {
-      method: 'POST',
-      headers: this.jsonHeaders(),
-      body: JSON.stringify({ path: filePath, content, allowedPath: this.allowedPath }),
-    });
-  }
-
-  // Git
-
-  getGitStatus(repositoryPath?: string): Promise<unknown> {
-    const query = repositoryPath ? `?path=${encodeURIComponent(repositoryPath)}` : '';
-    return this.requestData(`/git/status${query}`);
-  }
-
-  getGitLog(repositoryPath?: string): Promise<unknown> {
-    const query = repositoryPath ? `?path=${encodeURIComponent(repositoryPath)}` : '';
-    return this.requestData(`/git/log${query}`);
   }
 }
 

@@ -12,9 +12,6 @@ export const DEFAULT_SETTINGS: Settings = {
   baseUrl: '',
   model: DEFAULT_MODEL,
   theme: 'dark',
-  allowedPath: '',
-  enableFileManager: false,
-  enableGit: false,
   memoryEnabled: true,
 };
 
@@ -34,9 +31,6 @@ export function loadSettings(): Settings {
       baseUrl: parsed.baseUrl || '',
       model: normalizeModel(parsed.model),
       theme: parsed.theme || DEFAULT_SETTINGS.theme,
-      allowedPath: parsed.allowedPath || '',
-      enableFileManager: Boolean(parsed.enableFileManager),
-      enableGit: Boolean(parsed.enableGit),
       memoryEnabled: parsed.memoryEnabled !== false,
     };
   } catch {
