@@ -152,16 +152,44 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings, mod
               </div>
 
               {isLocalProvider && (
-                <div>
-                  <label className={LABEL_CLASS}>Base URL</label>
-                  <input
-                    type="text"
-                    value={baseUrl}
-                    onChange={(event) => setBaseUrl(event.target.value)}
-                    placeholder="e.g., http://localhost:11434/v1"
-                    className={INPUT_CLASS}
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className={LABEL_CLASS}>Base URL</label>
+                    <input
+                      type="text"
+                      value={baseUrl}
+                      onChange={(event) => setBaseUrl(event.target.value)}
+                      placeholder="e.g., http://localhost:11434/v1"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700/60 space-y-2">
+                    <h5 className="text-xs font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase">
+                      {provider === 'ollama' ? 'Ollama' : 'llama.cpp'} Reference
+                    </h5>
+                    {provider === 'ollama' ? (
+                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5 font-mono">
+                        <p><span className="text-gray-400 dark:text-gray-500"># Install & run</span></p>
+                        <p>curl -fsSL https://ollama.com/install.sh | sh</p>
+                        <p>ollama serve</p>
+                        <p className="pt-1"><span className="text-gray-400 dark:text-gray-500"># Pull a model</span></p>
+                        <p>ollama pull llama3</p>
+                        <p className="pt-1"><span className="text-gray-400 dark:text-gray-500"># Default base URL</span></p>
+                        <p>http://localhost:11434/v1</p>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5 font-mono">
+                        <p><span className="text-gray-400 dark:text-gray-500"># Build & run</span></p>
+                        <p>git clone https://github.com/ggerganov/llama.cpp</p>
+                        <p>cd llama.cpp && make</p>
+                        <p>./llama-server -m model.gguf</p>
+                        <p className="pt-1"><span className="text-gray-400 dark:text-gray-500"># Default base URL</span></p>
+                        <p>http://localhost:8080/v1</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               <div>
