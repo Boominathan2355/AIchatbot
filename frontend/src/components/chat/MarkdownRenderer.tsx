@@ -73,17 +73,17 @@ function MermaidDiagram({ code }: { code: string }) {
   );
 }
 
-function CodeBlock({ language, children }: { language: string; children: string }) {
+function CodeBlock({ language, rawText, children }: { language: string; rawText: string; children: ReactNode }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(children);
+    await navigator.clipboard.writeText(rawText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (language === 'mermaid') {
-    return <MermaidDiagram code={children} />;
+    return <MermaidDiagram code={rawText} />;
   }
 
   return (
@@ -113,7 +113,7 @@ function CodeBlock({ language, children }: { language: string; children: string 
         </pre>
       </div>
       {['html', 'css', 'javascript', 'js', 'jsx', 'typescript', 'tsx'].includes(language.toLowerCase()) && (
-        <LivePreview code={children} language={language} />
+        <LivePreview code={rawText} language={language} />
       )}
     </div>
   );
@@ -129,14 +129,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           code({ node, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = childrenToText(children).replace(/\n$/, '');
-            console.log('[code component] children type:', typeof children, 'isArray:', Array.isArray(children), 'result:', codeString.slice(0, 100));
 
             if (match) {
-              return <CodeBlock language={match[1]} children={codeString} />;
+              return <CodeBlock language={match[1]} rawText={codeString}>{children}</CodeBlock>;
             }
 
             if (codeString.includes('\n')) {
-              return <CodeBlock language="text" children={codeString} />;
+              return <CodeBlock language="text" rawText={codeString}>{children}</CodeBlock>;
             }
 
             return (
