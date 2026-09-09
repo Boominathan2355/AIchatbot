@@ -40,7 +40,7 @@ export async function saveMemory(req: AuthenticatedRequest, res: Response): Prom
       moreAbout: moreAbout ?? '',
       enabled: enabled !== false,
     },
-    { upsert: true, new: true, runValidators: true }
+    { upsert: true, new: true, runValidators: true, returnDocument: 'after' }
   );
 
   sendData(res, {
